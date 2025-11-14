@@ -1,0 +1,168 @@
+# ==========================================================
+# Configuration File for Compound Data Combination (Biorep1)
+# Author: Fatemeh
+# Purpose: Combine GC-MS compound data across all samples, QC, ENV, and BLANK files
+# ==========================================================
+
+qc_file:
+  path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/msmetrix_data/QC_msmetrix.xlsx"
+  sheet_index: 0
+  header_row: 12
+  preview_rows: 5
+
+potato_file:
+  input_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/final_sample_1-10.xlsx"
+  output_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/potato_data_filtered_94_samples.xlsx"
+  final_sample_ids_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/final_ids.txt"
+
+qc_merge:
+  master_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/files/project file/GCMS Steamed 96 set 2024- Mastertable(Sheet1).csv"
+  qc_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/cleaned_qc.csv"
+  output_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/merged_qc.csv"
+
+# -----------------------------------------------------
+data_paths:
+  base_compound_dir: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds"
+  output_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/combined.csv"
+
+  sample_files:
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/ALVERSTONE R..csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/ANTI.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/AVARNA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/CAMEL.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/CHOPIN.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/FELSINA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/INNOVATOR.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/JAERLA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/SARPO MIRA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_1/VAN GOGH.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_2/ALTUS.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_2/ARDECHE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_2/EL MUNDO.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_2/FABULA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_2/FONTANE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_2/JENNIFER.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_2/RED SCARLETT.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_2/RUSSET BURBANK.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_2/SUNDANCE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_3/ALTURAS.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_3/BARAKA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_3/ESCORT.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_3/FRISIA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_3/MARILYN.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_3/ORIANA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_3/SAGITTA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_3/SUPERIOR.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_3/NICOLA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/ALTHEA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/ANIVIA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/DONALD.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/FARIDA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/HANSA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/KENNEBEC.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/MEMPHIS.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/BILDTSTAR.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/REDDALE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_4/VIOLET QUEEN.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_5/ADORA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_5/DESIREE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_5/CLEARWATER R.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_5/PAYETTE RUSSET.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_5/PRINCEOFORANGE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_5/SYMFONIA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_5/VE 71-105.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_5/ARIZONA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_5/DIAMANT.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_6/AVENGER.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_6/CARRERA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_6/EVEREST.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_6/EVORA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_6/FENWAY RED.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_6/LADY CLAIRE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_6/RANGER RUSSET.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_6/RICKEY RUSSET.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_6/FORTUS.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/AGRIA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/CAROLINA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/COLOMBA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/CRISPS4ALL.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/DEODARA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/TETON RUSSET.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/KONDOR.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/MUSE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/PARELLA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_7/ROYAL.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/CARDYMA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/CECILE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/FLAMENCO.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/HERMES.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/NADINE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/NOBLESSE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/IVORY RUSSET.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/SABABA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/SALINERO.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_8/SPUNTA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_9/ALOUETTE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_9/ATLANTIC.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_9/BERBER.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_9/BLUE STAR.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_9/CARLITA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_9/CHALLENGER.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_9/CIKLAMEN.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_9/MONALISA.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_9/PEE WEE RUSSET.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_10/ARGOS.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_10/BINTJE.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_10/DELIA RED.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_10/FESTIEN.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_10/MULBERRYBEAUTY.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_10/OSPREY.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_10/SMART.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_10/TAURUS.csv"
+      - "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds/day_10/TRIPLE7.csv"
+
+# -----------------------------------------------------
+# Other Project Paths
+# -----------------------------------------------------
+paths:
+  base_dir: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/biorep1"
+  save_dir: 'C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/'
+
+
+  samples_filtered: "C:\\Users\\fatemehm\\OneDrive - Royal HZPC Group\\documents\\GitHub\\internship\\biorep1\\samples_filtered.csv"
+  compound_intensity_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/biorep1/compound_intensity_matched.csv"
+  aroma_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/biorep1/aroma_compound_intensity.csv"
+  aroma_with_descriptions_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/biorep1/aroma_compound_with_descriptions.csv"
+  aroma_matrix_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/biorep1/aroma_intensity_matrix.csv"
+
+  sensory_data: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/compound_analysis/Sensorial profiling SD 2005.xlsx"
+  aroma_descriptions: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/compound_analysis/aroma_descriptions.json"
+  chemical_family_map: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/compound_analysis/chemical_family_map.json"
+  aroma_sensory_corr_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/figures/aroma_sensory_corr_top15.csv"
+
+parameters:
+  rt_tolerance: 0.5
+
+settings:
+  encoding: "utf-8"
+  display_rows: 5
+  correlation_threshold: 0.2
+  min_compounds: 15
+
+interpretation:
+  pc1_thresh: 1.5
+  pc2_thresh: 1.0
+  save_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/variety_sensory_summary.csv"
+
+clustering:
+  max_clusters: 10
+  top_n_traits: 3
+  scale_ellipse: 2.5
+  save_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/pca_clustered.csv"
+
+data:
+  genetic_data: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/GeneMarkers-95 varieties 1.csv"
+  aroma_data: 'C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/aroma_intensity_matrix.csv'
+  gwas_output_gene_aroma: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/documents/GitHub/internship/biorep1/save_results/gwas_aroma_all_traits.csv"
+  gwas_output_sensory: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/gwas_sensory_PCs.csv"
+  sensory_pca_pc_df: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/biorep1/results/sensory_pca_pc_df.csv"
