@@ -1,4 +1,16 @@
 
+"""
+Author: Fatemeh Monfared
+Module: Data Preparation Module
+Purpose: Utility functions for preparation, preprocessing and structuring dataset.
+Thesis: Data-Driven Analysis of Potato Aroma and Flavor Using TD-GC-MS and Machine Learning
+Affiliation: Hanze University of Applied Sciences
+Year: 2025
+"""
+
+
+
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,20 +23,34 @@ from scipy.stats import zscore
 from sklearn.feature_selection import SelectKBest, f_classif
 from scipy.spatial.distance import mahalanobis
 from numpy.linalg import inv
-import scipy.stats as stats
 from sklearn.decomposition import PCA
 import matplotlib.patches as mpatches
-from numpy.linalg import inv
 import scipy.stats as stats
 from sklearn.preprocessing import RobustScaler
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import StandardScaler
-from scipy.cluster.hierarchy import linkage, dendrogram
 from sklearn.cross_decomposition import PLSRegression
 import networkx as nx
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from sklearn.linear_model import LinearRegression
 import seaborn as sns
+import plotly.graph_objs as go
+from plotly.subplots import make_subplots
+from dash import Dash, dcc, html, Input, Output
+from scipy.stats import f_oneway
+import yaml
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+from scipy.cluster.hierarchy import cophenet
+import plotly.express as px
+from scipy.spatial.distance import pdist
+from sklearn.metrics import (
+        silhouette_score,
+        calinski_harabasz_score,
+        davies_bouldin_score
+    )
+ 
 
 def read_qc_file(file_path, sheet_index=0, header_row=12, preview_rows=5):
     """
@@ -43,7 +69,6 @@ def read_qc_file(file_path, sheet_index=0, header_row=12, preview_rows=5):
         except Exception as e2:
             print(f" Could not read file as CSV either: {e2}")
             raise e2
-
     print("\n Preview of QC data:")
     print(qc_data.head(preview_rows))
     return qc_data
@@ -76,10 +101,9 @@ def clean_qc_data(qc_data: pd.DataFrame, output_path: str) -> pd.DataFrame:
     pd.DataFrame
         Cleaned QC data with 'tR_best' column.
     """
-    # Step 1: Clean column names
+    #Clean column names
     qc_data.columns = qc_data.columns.str.strip()
-
-    # Step 2: Select metadata and T1 sample columns
+    # Select metadata and T1 sample columns
     metadata_cols = ['Peak', 'tR1', 'tR2', 'tR', 'm/z']
     t1_cols = [c for c in qc_data.columns if c.strip().endswith("T1")]
     qc_data_T1 = qc_data[metadata_cols + t1_cols]
@@ -87,33 +111,29 @@ def clean_qc_data(qc_data: pd.DataFrame, output_path: str) -> pd.DataFrame:
     print(f"Selected T1 columns ({len(t1_cols)}): {t1_cols}")
     print(f"Data shape before cleaning: {qc_data_T1.shape}")
 
-    # Step 3: Calculate retention time differences
+    #  Calculate retention time differences
     diff_t_vs_1 = (qc_data_T1['tR'] - qc_data_T1['tR1']).abs()
     diff_t_vs_2 = (qc_data_T1['tR'] - qc_data_T1['tR2']).abs()
     diff_1_vs_2 = (qc_data_T1['tR1'] - qc_data_T1['tR2']).abs()
     avg_t = (qc_data_T1['tR1'] + qc_data_T1['tR2']) / 2
     diff_avg_vs_t = (avg_t - qc_data_T1['tR']).abs()
 
-    # Optional: print summary statistics
+    # summary statistics
     print("\nRetention time differences summary:")
     print("abs(tR - tR1):\n", diff_t_vs_1.describe(), "\n")
     print("abs(tR - tR2):\n", diff_t_vs_2.describe(), "\n")
     print("abs(tR1 - tR2):\n", diff_1_vs_2.describe(), "\n")
     print("abs(avg(tR1,tR2) - tR):\n", diff_avg_vs_t.describe(), "\n")
-
-    # Step 4: Add averaged retention time
+    # Add averaged retention time
     qc_data_T1['tR_best'] = avg_t
-
-    # Step 5: Remove redundant columns
+    # Remove redundant columns
     to_keep = [col for col in qc_data_T1.columns if col not in ['tR1', 'tR2', 'tR']]
     cleaned_qc = qc_data_T1[to_keep]
-
-    # Step 6: Reorder columns to put 'tR_best' after 'Peak'
+    # Reorder columns to put 'tR_best' after 'Peak'
     cols = cleaned_qc.columns.tolist()
     cols.insert(cols.index('Peak') + 1, cols.pop(cols.index('tR_best')))
     cleaned_qc = cleaned_qc[cols]
-
-    # Step 7: Save the cleaned QC data
+    # Save the cleaned QC data
     cleaned_qc.to_csv(output_path, index=False)
     print(f"\n Cleaned QC data saved to: {output_path}")
     print(f"Final shape: {cleaned_qc.shape}")
@@ -128,7 +148,6 @@ def merge_qc_with_master(master_path, qc_path, output_path):
     Merges the cleaned QC data with the Master GC–MS table for compound validation.
     Adds progress output and peak consistency reporting.
     """
-
     print("\n Merging Master and Cleaned QC files...")
     print(f" Master path: {master_path}")
     print(f" QC path: {qc_path}\n")
@@ -151,7 +170,6 @@ def merge_qc_with_master(master_path, qc_path, output_path):
     # Peak consistency check
     master_peaks = set(master_df["Peak"])
     qc_peaks = set(qc_df["Peak"])
-
     common_peaks = master_peaks.intersection(qc_peaks)
     missing_in_qc = master_peaks - qc_peaks
     missing_in_master = qc_peaks - master_peaks
@@ -165,14 +183,13 @@ def merge_qc_with_master(master_path, qc_path, output_path):
 
     # Merge based on shared 'Peak'
     merged_df = pd.merge(master_df, qc_df, left_on="Filename", right_on="ID Names", how="inner")
-
     print(f"\n Merged DataFrame shape: {merged_df.shape}")
 
     # Save merged file
     merged_df.to_csv(output_path, index=False)
     print(f" Saved merged QC–Master file to:\n{output_path}\n")
 
-    # Optional: Save unmatched peaks
+    # Save unmatched peaks
     if missing_in_qc:
         pd.DataFrame(sorted(missing_in_qc), columns=["Missing_in_QC"]).to_csv(
             output_path.replace(".csv", "_missing_in_QC.csv"), index=False
@@ -183,7 +200,6 @@ def merge_qc_with_master(master_path, qc_path, output_path):
             output_path.replace(".csv", "_missing_in_Master.csv"), index=False
         )
         print(f" Missing peaks in Master saved to: {output_path.replace('.csv', '_missing_in_Master.csv')}")
-
     return merged_df
 
 
@@ -220,17 +236,13 @@ def filter_potato_data(input_path, output_path, final_normalized_ids):
         return "_".join(cleaned)
 
     norm_to_col = {normalize_id(c): c for c in sample_cols}
-
     # Filter for desired IDs
     selected_columns = [norm_to_col[nid] for nid in final_normalized_ids if nid in norm_to_col]
-
     #  Combine metadata + selected columns
     potato_data_filtered = potato_data[metadata_cols + selected_columns]
-
     # Save filtered dataset
     potato_data_filtered.to_excel(output_path, index=False)
     print(f" Dataset saved with {len(selected_columns)} samples + metadata columns at:\n{output_path}")
-
     return potato_data_filtered
 
 
@@ -239,7 +251,7 @@ def clean_potato_data(potato_data_filtered, output_path):
     Cleans filtered potato GC-MS data by analyzing retention time consistency,
     computing tR_best, and selecting essential columns for further analysis.
     """
-    print("\n🧹 Cleaning potato dataset and computing tR_best...")
+    print("\n Cleaning potato dataset and computing tR_best...")
 
     #  Compute differences between retention times
     diff_t_vs_1 = (potato_data_filtered['tR'] - potato_data_filtered['tR1']).abs()
@@ -248,7 +260,7 @@ def clean_potato_data(potato_data_filtered, output_path):
     avg_t = (potato_data_filtered['tR1'] + potato_data_filtered['tR2']) / 2
     diff_avg_vs_t = (avg_t - potato_data_filtered['tR']).abs()
 
-    #  Print summary statistics
+    #  summary statistics
     print("abs(tR - tR1):\n", diff_t_vs_1.describe(), "\n")
     print("abs(tR - tR2):\n", diff_t_vs_2.describe(), "\n")
     print("abs(tR1 - tR2):\n", diff_1_vs_2.describe(), "\n")
@@ -256,16 +268,13 @@ def clean_potato_data(potato_data_filtered, output_path):
 
     #  Rename tR to tR_best
     selected_data = potato_data_filtered.rename(columns={'tR': 'tR_best'})
-
     #  Keep only relevant columns
     columns_to_keep = ['Peak', 'tR_best', 'm/z'] + [c for c in selected_data.columns if c.startswith('s')]
     selected_data = selected_data[columns_to_keep].copy()
-
     #  Save cleaned dataset
     selected_data.to_excel(output_path, index=False)
     print(f" Cleaned dataset saved at:\n{output_path}")
     print("Selected data shape:", selected_data.shape)
-
     return selected_data
 
 
@@ -278,9 +287,9 @@ def match_alkanes(cleaned_data, rt_tolerance=0.05, mz_tolerance=0.2):
     ----------
     cleaned_data : pd.DataFrame
         Cleaned GC-MS dataset containing at least 'Peak', 'tR_best', and 'm/z' columns.
-    rt_tolerance : float, optional
+    rt_tolerance : float
         Retention time matching tolerance window (default: 0.05).
-    mz_tolerance : float, optional
+    mz_tolerance : float
         m/z value matching tolerance window (default: 0.2).
 
     Returns
@@ -302,7 +311,6 @@ def match_alkanes(cleaned_data, rt_tolerance=0.05, mz_tolerance=0.2):
     ])
 
     matches = []
-
     #  Iterate through each reference alkane and find matches
     for _, alk in alkanes.iterrows():
         subset = cleaned_data[
@@ -323,7 +331,7 @@ def match_alkanes(cleaned_data, rt_tolerance=0.05, mz_tolerance=0.2):
 
     alkane_matches = pd.DataFrame(matches)
 
-    #  Print summary
+    #  summary
     if alkane_matches.empty:
         print(" No alkane matches found within tolerance limits.")
     else:
@@ -338,7 +346,6 @@ def plot_alkane_alignment(alkane_matches):
     Plots expected vs observed retention times for matched alkanes.
     Shows alignment, deviation, and ideal 1:1 line.
     """
-
     if alkane_matches.empty:
         print(" No alkane matches to plot.")
         return
@@ -353,7 +360,7 @@ def plot_alkane_alignment(alkane_matches):
         label="Alkane match"
     )
 
-    # Ideal 1:1 line (expected = observed)
+    # expected = observed
     plt.plot(
         [alkane_matches["Expected_tR"].min(), alkane_matches["Expected_tR"].max()],
         [alkane_matches["Expected_tR"].min(), alkane_matches["Expected_tR"].max()],
@@ -426,13 +433,11 @@ def merge_qc_with_master(file_master, file_qc):
         on="Filename",
         how="left"
     )
-
     # Keep only QC samples
     df_qc = df_merged_qc[df_merged_qc["Sample"].str.startswith("QC")].copy()
 
     print(f" Merged QC dataset shape: {df_qc.shape}")
     print(f"Included metadata columns: {', '.join(['Sample', 'Day', 'Injection_order'])}")
-
     return df_qc
 
 
@@ -459,9 +464,7 @@ def evaluate_qc_linearity(alkane_matches, df_qc):
         Summary table with columns:
         ['Compound', 'Peak', 'Day', 'tR_best', 'm/z', 'R2']
     """
-
     results = []
-
     for (compound, peak), sub_matches in alkane_matches.groupby(["Compound", "Peak"]):
         # Filter QC data for this peak
         for day, sub in df_qc[df_qc["Peak"] == peak].groupby("Day"):
@@ -486,15 +489,12 @@ def evaluate_qc_linearity(alkane_matches, df_qc):
                     "m/z": sub["m/z"].iloc[0],
                     "R2": r2
                 })
-
     results_df = pd.DataFrame(results)
     print(f" Evaluated QC linearity for {len(results_df)} (Compound, Day) combinations.")
     return results_df
 
 
-import plotly.graph_objs as go
-from plotly.subplots import make_subplots
-from dash import Dash, dcc, html, Input, Output
+
 
 
 def launch_qc_linearity_dashboard(df_qc, results_df, port=8040):
@@ -517,7 +517,6 @@ def launch_qc_linearity_dashboard(df_qc, results_df, port=8040):
     port : int, optional
         Port to run the dashboard on (default = 8040).
     """
-
     # Define QC concentration mapping
     qc_concentrations = {
         "QC1": 312.5,
@@ -526,7 +525,7 @@ def launch_qc_linearity_dashboard(df_qc, results_df, port=8040):
         "QC4": 2500
     }
 
-    # --- Initialize Dash app ---
+    # Initialize Dash app 
     app = Dash(__name__)
     app.title = "QC Linear Trend Dashboard"
 
@@ -542,11 +541,10 @@ def launch_qc_linearity_dashboard(df_qc, results_df, port=8040):
                 clearable=False
             )
         ], style={"width": "40%", "margin": "auto"}),
-
         dcc.Graph(id="qc-trend-plots", style={"marginTop": "30px"})
     ])
 
-    # --- Define callback for interactivity ---
+    # Define callback for interactivity 
     @app.callback(
         Output("qc-trend-plots", "figure"),
         Input("day-dropdown", "value")
@@ -560,13 +558,11 @@ def launch_qc_linearity_dashboard(df_qc, results_df, port=8040):
         for _, row_data in day_results.iterrows():
             sub = df_qc[(df_qc["Peak"] == row_data["Peak"]) &
                         (df_qc["Day"] == selected_day)].copy()
-
             sub["QC_label"] = sub["Sample"].str.extract(r"(QC\d+)")
             sub["Concentration"] = sub["QC_label"].map(qc_concentrations)
 
             X = sub["Concentration"].values.reshape(-1, 1)
             y = sub["Intensity"].values
-
             if len(sub) > 1:
                 model = LinearRegression().fit(X, y)
                 y_pred = model.predict(X)
@@ -579,10 +575,8 @@ def launch_qc_linearity_dashboard(df_qc, results_df, port=8040):
                 f"{row_data['Compound']} (Peak {int(row_data['Peak'])}, R²={r2:.2f})"
             )
             traces.append((sub["Concentration"], y, y_pred, row_data))
-
         # Create grid layout (3x3)
         fig = make_subplots(rows=3, cols=3, subplot_titles=subplot_titles)
-
         row_idx, col_idx = 1, 1
         for x_vals, y_vals, y_pred, row_data in traces:
             fig.add_trace(
@@ -607,7 +601,6 @@ def launch_qc_linearity_dashboard(df_qc, results_df, port=8040):
             if col_idx > 3:
                 col_idx = 1
                 row_idx += 1
-
         fig.update_layout(
             height=850,
             width=1100,
@@ -616,27 +609,24 @@ def launch_qc_linearity_dashboard(df_qc, results_df, port=8040):
         )
 
         return fig
-
-    # --- Run the dashboard ---
+    #  Run the dashboard 
     print(f" Launching QC Linear Trend Dashboard at http://127.0.0.1:{port}")
     app.run(debug=True, port=port)
 
 
-import pandas as pd
+
 
 def filter_stable_peaks_by_r2(results_df, r2_threshold=0.9):
     """
     Filters peaks (compounds) that show stable QC linearity based on an R² threshold.
-
     Parameters
     ----------
     results_df : pd.DataFrame
         DataFrame containing regression results from evaluate_qc_linearity(),
         with columns ['Compound', 'Peak', 'Day', 'tR_best', 'm/z', 'R2'].
-    r2_threshold : float, optional
+    r2_threshold : float
         Minimum acceptable R² value for a compound/day to be considered stable.
         Default = 0.9.
-
     Returns
     -------
     pd.DataFrame
@@ -644,10 +634,8 @@ def filter_stable_peaks_by_r2(results_df, r2_threshold=0.9):
     """
     # Apply threshold filter
     stable_peaks = results_df[results_df["R2"] >= r2_threshold].copy()
-
     # Sort for readability
     stable_peaks = stable_peaks.sort_values(["Day", "Compound"])
-
     # Display summary
     print(f" Found {stable_peaks['Peak'].nunique()} unique stable peaks "
           f"across {stable_peaks['Day'].nunique()} days (R² ≥ {r2_threshold})")
@@ -657,7 +645,6 @@ def filter_stable_peaks_by_r2(results_df, r2_threshold=0.9):
 
 
 
-from scipy.stats import f_oneway
 
 def perform_anova_on_qc_peaks(df_qc, results_df):
     """
@@ -679,14 +666,12 @@ def perform_anova_on_qc_peaks(df_qc, results_df):
         ['Compound', 'Peak', 'tR_best', 'm/z', 'ANOVA_F', 'ANOVA_p'].
     """
     anova_results = []
-
     # Iterate over all compound-peak combinations
     for compound in results_df["Compound"].unique():
         peak_ids = results_df.loc[results_df["Compound"] == compound, "Peak"].unique()
 
         for peak in peak_ids:
             sub = df_qc[df_qc["Peak"] == peak]
-
             # Group intensities by day
             groups = [group["Intensity"].values for _, group in sub.groupby("Day")]
 
@@ -701,23 +686,18 @@ def perform_anova_on_qc_peaks(df_qc, results_df):
                     "ANOVA_F": f_stat,
                     "ANOVA_p": p_val
                 })
-
     anova_df = pd.DataFrame(anova_results)
-
     print(f" ANOVA completed for {len(anova_df)} peaks across days.")
     print(f"Significant (p<0.05): {(anova_df['ANOVA_p'] < 0.05).sum()} peaks")
-
     return anova_df
 
 
 
-from statsmodels.nonparametric.smoothers_lowess import lowess
 
 def plot_loess_trends_for_stable_peaks(df_qc, stable_peaks, max_plots=9, frac=0.3):
     """
     Plots LOESS-smoothed intensity trends across injection order 
     for stable QC peaks (R²-filtered).
-
     Parameters
     ----------
     df_qc : pd.DataFrame
@@ -726,20 +706,18 @@ def plot_loess_trends_for_stable_peaks(df_qc, stable_peaks, max_plots=9, frac=0.
     stable_peaks : pd.DataFrame
         DataFrame of stable peaks returned by filter_stable_peaks_by_r2(),
         must include a 'Peak' column.
-    max_plots : int, optional
+    max_plots : int
         Maximum number of peaks to plot (default: 9).
-    frac : float, optional
+    frac : float
         Fraction of data used for LOESS smoothing (default: 0.3).
 
     Returns
     -------
-    None
+    
         Displays a grid of scatter plots with LOESS fits.
     """
     stable_ids = stable_peaks["Peak"].unique()[:max_plots]
-
     plt.figure(figsize=(14, 10))
-
     for i, peak in enumerate(stable_ids, 1):
         sub = df_qc[df_qc["Peak"] == peak].dropna(subset=["Intensity", "Injection_order"])
         if sub.empty:
@@ -750,19 +728,15 @@ def plot_loess_trends_for_stable_peaks(df_qc, stable_peaks, max_plots=9, frac=0.
 
         # LOESS smoothing for visualization
         loess_fit = lowess(y, x, frac=frac, return_sorted=True)
-
         plt.subplot(3, 3, i)
         plt.scatter(x, y, alpha=0.6, label=f"Peak {peak}", color="steelblue")
         plt.plot(loess_fit[:, 0], loess_fit[:, 1], color="red", linewidth=2, label="LOESS")
-
         plt.title(f"Peak {peak}\n tR={sub['tR_best'].iloc[0]:.2f}, m/z={sub['m/z'].iloc[0]}")
         plt.xlabel("Injection order")
         plt.ylabel("Intensity")
         plt.legend()
-
     plt.tight_layout()
     plt.show()
-
     print(f" Displayed LOESS trends for {len(stable_ids)} stable peaks.")
 
 
@@ -773,18 +747,17 @@ def plot_alkane_stability_colored(df_qc, stable_peaks, qc_levels=None, r2_thresh
     """
     Visualizes alkane QC stability across injections with distinct colors per QC level.
     Adds human-readable stability status  based on R² threshold.
-
     Parameters
     ----------
     df_qc : pd.DataFrame
         QC merged dataset containing 'Peak', 'Injection_order', 'Sample', and 'Intensity'.
     stable_peaks : pd.DataFrame
         DataFrame with alkane peaks (includes columns 'Peak', 'tR_best', 'm/z').
-    qc_levels : list of str, optional
+    qc_levels : list of str
         QC identifiers to include, default: ["QC1", "QC2", "QC3", "QC4"].
-    r2_threshold : float, optional
+    r2_threshold : float
         R² threshold for determining stability (default 0.2).
-    log_transform : bool, optional
+    log_transform : bool
         If True, applies log10 transformation to intensity.
 
     Returns
@@ -792,12 +765,6 @@ def plot_alkane_stability_colored(df_qc, stable_peaks, qc_levels=None, r2_thresh
     stability_results : pd.DataFrame
         R² values and stability labels for each peak and QC level.
     """
-
-    import numpy as np
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    from sklearn.linear_model import LinearRegression
-
     if qc_levels is None:
         qc_levels = ["QC1", "QC2", "QC3", "QC4"]
 
@@ -818,7 +785,6 @@ def plot_alkane_stability_colored(df_qc, stable_peaks, qc_levels=None, r2_thresh
     else:
         y_col = "Intensity"
         y_label = "Intensity"
-
     plt.figure(figsize=(14, 10))
     stability_records = []
 
@@ -829,7 +795,6 @@ def plot_alkane_stability_colored(df_qc, stable_peaks, qc_levels=None, r2_thresh
 
         plt.subplot(3, 3, i)
         r2_values = []
-
         for qc in qc_levels:
             sub_qc = sub[sub["Sample"].str.startswith(qc)].copy()
             if sub_qc.empty:
@@ -847,15 +812,13 @@ def plot_alkane_stability_colored(df_qc, stable_peaks, qc_levels=None, r2_thresh
                 r2 = np.nan
 
             r2_values.append(r2)
-
             #  Correct stability condition
-            stability = "Stable" if (not np.isnan(r2) and r2 < r2_threshold) else "Unstable ⚠"
+            stability = "Stable" if (not np.isnan(r2) and r2 < r2_threshold) else "Unstable "
             color = colors.get(qc, "gray")
 
             plt.scatter(x, y, alpha=0.7, label=f"{qc} (R²={r2:.2f}, {stability})", color=color)
             linestyle = "-" if "Stable" in stability else "--"
             plt.plot(x, y_pred, linestyle=linestyle, color=color)
-
             stability_records.append({
                 "Peak": peak,
                 "QC_Level": qc,
@@ -867,7 +830,7 @@ def plot_alkane_stability_colored(df_qc, stable_peaks, qc_levels=None, r2_thresh
 
         #  Determine overall stability for this peak
         max_r2 = np.nanmax(r2_values) if r2_values else np.nan
-        overall_status = "Stable " if max_r2 < r2_threshold else "Unstable ⚠"
+        overall_status = "Stable " if max_r2 < r2_threshold else "Unstable"
         title_color = "green" if "Stable" in overall_status else "red"
 
         plt.title(
@@ -881,18 +844,16 @@ def plot_alkane_stability_colored(df_qc, stable_peaks, qc_levels=None, r2_thresh
 
     plt.tight_layout()
     plt.show()
-
     stability_df = pd.DataFrame(stability_records)
     return stability_df
 
 
-import yaml
+
 
 def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, config_path, loess_frac=0.3):
     """
     Applies LOESS-based global drift correction using alkane QC peaks.
     Shows before/after evaluation as boxplots (no per-peak metrics).
-
     Parameters
     ----------
     df_qc : pd.DataFrame
@@ -917,18 +878,16 @@ def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, con
             "var_after": overall variance after correction
         }
     """
-
-    # --- Load master table from config ---
+    #  Load master table from config 
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
-
     master_path = config.get("qc_merge", {}).get("master_path", config.get("master_path"))
     if not master_path:
         raise KeyError(" master_path not found in config YAML.")
     print(f" Loaded master table from: {master_path}")
     master_table = pd.read_csv(master_path)
 
-    # --- Step 1: Estimate drift from alkane QCs ---
+    #  Estimate drift from alkane QCs 
     alkane_ids = stable_peaks["Peak"].unique()
     alkan_qc = df_qc[df_qc["Peak"].isin(alkane_ids)].copy()
     alkan_qc["QC_label"] = alkan_qc["Sample"].str.extract(r"(QC\d+)")
@@ -946,8 +905,7 @@ def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, con
     plt.title("Global drift estimated from alkane QCs")
     plt.legend()
     plt.show()
-
-    # --- Step 2: Prepare sample data ---
+    #Prepare sample data 
     metadata_cols = ['Peak', 'tR_best', 'm/z']
     sample_cols = [c for c in selected_data.columns if c not in metadata_cols]
     rename_map = {col: col.split()[-1] for col in sample_cols}
@@ -966,8 +924,7 @@ def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, con
     samples_merged = samples_merged.dropna(subset=["Intensity", "Injection_order"])
 
     all_data = pd.concat([samples_merged, df_qc], ignore_index=True)
-
-    # --- Step 3: Apply global drift correction ---
+    # Apply global drift correction
     corrected_records = []
     for peak in all_data["Peak"].unique():
         sub = all_data[all_data["Peak"] == peak].copy()
@@ -979,7 +936,7 @@ def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, con
 
     df_corrected = pd.concat(corrected_records, ignore_index=True)
 
-    # --- Step 4: Global QC evaluation ---
+    # Global QC evaluation
     qc_raw = df_qc[df_qc["Sample"].astype(str).str.startswith("QC")]
     qc_corr = df_corrected[df_corrected["Sample"].astype(str).str.startswith("QC")]
 
@@ -994,7 +951,7 @@ def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, con
     print(f" Global QC R² before: {qc_r2_before:.4f}")
     print(f" Global QC R² after : {qc_r2_after:.4f}")
 
-    # --- Boxplot for QC drift ---
+    # Boxplot for QC drift 
     qc_box = pd.DataFrame({
         "Stage": ["Before"] * len(y_raw) + ["After"] * len(y_corr),
         "Log_Intensity": np.concatenate([y_raw, y_corr])
@@ -1004,8 +961,7 @@ def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, con
     plt.title("QC Log₁₀ Intensities Before vs After Correction")
     plt.ylabel("Log₁₀ Intensity")
     plt.show()
-
-    # --- Step 5: Global sample variance before/after ---
+    # Global sample variance before/after 
     samples_raw = samples_merged["Intensity"]
     samples_corr = df_corrected[
         ~df_corrected["Sample"].astype(str).str.startswith("QC")
@@ -1017,7 +973,7 @@ def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, con
     print(f" Global sample variance before: {var_before:.6f}")
     print(f" Global sample variance after : {var_after:.6f}")
 
-    # --- Boxplot for sample intensities ---
+    #Boxplot for sample intensities 
     sample_box = pd.DataFrame({
         "Stage": ["Before"] * len(samples_raw) + ["After"] * len(samples_corr),
         "Log_Intensity": np.concatenate([np.log10(samples_raw + 1), np.log10(samples_corr + 1)])
@@ -1027,7 +983,6 @@ def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, con
     plt.title("Sample Log₁₀ Intensities Before vs After Correction")
     plt.ylabel("Log₁₀ Intensity")
     plt.show()
-
     print(" Drift correction and global boxplot evaluation completed.")
     return {
         "df_corrected": df_corrected,
@@ -1057,8 +1012,7 @@ def plot_qc_drift_slopes(df_qc, df_corrected):
     slopes_df : pd.DataFrame
         DataFrame with slope per QC before and after correction.
     """
-
-    # --- Calculate slopes before correction ---
+    # Calculate slopes before correction 
     slopes_before = []
     for peak in df_qc["Peak"].unique():
         sub = df_qc[df_qc["Peak"] == peak].copy()
@@ -1074,7 +1028,7 @@ def plot_qc_drift_slopes(df_qc, df_corrected):
 
     slopes_before_df = pd.DataFrame(slopes_before, columns=["QC", "Slope_before"])
 
-    # --- Calculate slopes after correction ---
+    # Calculate slopes after correction 
     slopes_after = []
     for peak in df_corrected["Peak"].unique():
         sub = df_corrected[df_corrected["Peak"] == peak].copy()
@@ -1090,10 +1044,10 @@ def plot_qc_drift_slopes(df_qc, df_corrected):
 
     slopes_after_df = pd.DataFrame(slopes_after, columns=["QC", "Slope_after"])
 
-    # --- Merge before/after slopes ---
+    # Merge before/after slopes 
     slopes_df = pd.merge(slopes_before_df, slopes_after_df, on="QC", how="inner")
 
-    # --- Melt for plotting ---
+    # Melt for plotting 
     slopes_melt = pd.melt(
         slopes_df,
         id_vars="QC",
@@ -1102,7 +1056,7 @@ def plot_qc_drift_slopes(df_qc, df_corrected):
         value_name="Slope"
     )
 
-    # --- Boxplot visualization ---
+    # Boxplot visualization 
     plt.figure(figsize=(10, 6))
     sns.boxplot(data=slopes_melt, x="QC", y="Slope", hue="Stage",
                 palette=["#FF9999", "#66CC99"], linewidth=1.2)
@@ -1113,8 +1067,7 @@ def plot_qc_drift_slopes(df_qc, df_corrected):
     plt.legend(title="Stage", loc="upper right")
     plt.tight_layout()
     plt.show()
-
-    # --- Print summary stats ---
+    # summary stats
     print("\n Mean slope before correction:", slopes_df["Slope_before"].mean())
     print(" Mean slope after correction :", slopes_df["Slope_after"].mean())
 
@@ -1128,12 +1081,10 @@ def optimize_loess_drift_correction(df_qc, stable_peaks, frac_values=[0.2, 0.3, 
     """
     Optimize LOESS parameters (frac, alpha, delta) for signal drift correction 
     in QC chromatographic data using alkanes as stable reference peaks.
-
     This function performs a grid search over specified LOESS parameters,
     fits the LOESS model to log-transformed QC alkanes, applies drift correction
     across the dataset, and evaluates performance by comparing the R² 
     improvement (before vs. after correction) for each peak.
-
     Parameters
     ----------
     df_qc : pandas.DataFrame
@@ -1146,7 +1097,6 @@ def optimize_loess_drift_correction(df_qc, stable_peaks, frac_values=[0.2, 0.3, 
         List of significance levels for evaluation (kept for future extensions).
     delta_values : list of float, optional
         List of delta values for LOESS distance weighting to test.
-
     Returns
     -------
     best_params : pandas.Series
@@ -1157,16 +1107,8 @@ def optimize_loess_drift_correction(df_qc, stable_peaks, frac_values=[0.2, 0.3, 
     heatmap : matplotlib.figure.Figure
         A heatmap visualization of the mean improvements across frac and delta.
     """
-    import numpy as np
-    import pandas as pd
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    from statsmodels.nonparametric.smoothers_lowess import lowess
-    from sklearn.linear_model import LinearRegression
-
     results = []
-
-    # Use only QC alkanes for LOESS fitting
+    # only QC alkanes for LOESS fitting
     alkan_qc = df_qc[df_qc["Peak"].isin(stable_peaks["Peak"].unique())].copy()
     alkan_qc["Log_Intensity"] = np.log10(alkan_qc["Intensity"] + 1)
 
@@ -1210,7 +1152,7 @@ def optimize_loess_drift_correction(df_qc, stable_peaks, frac_values=[0.2, 0.3, 
                     mean_improvement = np.mean(improvements)
                     results.append((frac, alpha, delta, mean_improvement))
 
-    # Summarize results
+    # results
     opt_df = pd.DataFrame(results, columns=["frac", "alpha", "delta", "mean_improvement"])
     best_params = opt_df.loc[opt_df["mean_improvement"].idxmax()]
 
@@ -1234,7 +1176,6 @@ def evaluate_qc_reproducibility(df_corrected):
     coefficient of variation (CV), and data completeness — for each QC sample.
     It also derives a composite score based on signal stability and intensity,
     ranking QCs from most to least reproducible.
-
     Parameters
     ----------
     df_corrected : pd.DataFrame
@@ -1247,25 +1188,24 @@ def evaluate_qc_reproducibility(df_corrected):
         DataFrame containing per-QC summary statistics:
         ['Sample', 'Median_intensity', 'CV', 'Completeness', 'Score', 'Rank']
     """
-  
 
-    # --- Extract only QC rows ---
+    # Extract only QC rows 
     qc_corrected = df_corrected[df_corrected["Sample"].astype(str).str.startswith("QC")].copy()
 
-    # --- Compute per-QC metrics ---
+    # Compute per-QC metrics 
     qc_stats = qc_corrected.groupby("Sample").agg(
         Median_intensity=("Intensity_corrected", "median"),
         CV=("Intensity_corrected", lambda x: np.std(x) / np.mean(x) if np.mean(x) > 0 else np.nan),
         Completeness=("Intensity_corrected", lambda x: x.notna().mean())
     ).reset_index()
 
-    # --- Compute composite score ---
+    # Compute composite score 
     qc_stats["Score"] = qc_stats["Median_intensity"].apply(np.log1p) / qc_stats["CV"]
 
-    # --- Rank QCs (higher score = better reproducibility) ---
+    # Rank QCs (higher score = better reproducibility)
     qc_stats["Rank"] = qc_stats["Score"].rank(ascending=False).astype(int)
 
-    # --- Display sorted summary ---
+    # Display sorted summary 
     qc_sorted = qc_stats.sort_values("Rank").reset_index(drop=True)
     print("QC reproducibility ranking (best → worst):")
     print(qc_sorted)
@@ -1286,14 +1226,10 @@ def plot_qc_reproducibility(qc_stats):
     -------
     None
     """
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-
     qc_sorted = qc_stats.sort_values("Rank")
 
     plt.figure(figsize=(7, 5))
     sns.barplot(data=qc_sorted, x="Sample", y="Score", palette="viridis")
-
     plt.title("QC Reproducibility Ranking (Higher = Better)", fontsize=13)
     plt.xlabel("QC Sample")
     plt.ylabel("Composite Reproducibility Score (log(Median) / CV)")
@@ -1311,7 +1247,7 @@ def normalize_samples(df_corrected, qc_label="QC1"):
     df_corrected : pd.DataFrame
         Drift-corrected dataset containing:
         ['Sample', 'Peak', 'Intensity_corrected'] columns.
-    qc_label : str, optional
+    qc_label : str
         QC sample name used as normalization reference (default='QC1').
 
     Returns
@@ -1322,11 +1258,11 @@ def normalize_samples(df_corrected, qc_label="QC1"):
     """
 
 
-    # --- Separate QCs and samples ---
+    #  Separate QCs and samples 
     qcs = df_corrected[df_corrected["Sample"].astype(str).str.startswith("QC")].copy()
     samples = df_corrected[~df_corrected["Sample"].astype(str).str.startswith("QC")].copy()
 
-    # --- Compute median intensity per peak from reference QC ---
+    # Compute median intensity per peak from reference QC
     qc_ref = (
         qcs[qcs["Sample"].astype(str).str.startswith(qc_label)]
         .groupby("Peak")["Intensity_corrected"]
@@ -1334,19 +1270,18 @@ def normalize_samples(df_corrected, qc_label="QC1"):
         .rename(f"{qc_label}_median")
     )
 
-    # --- Merge QC reference with sample data ---
+    # Merge QC reference with sample data 
     samples = samples.merge(qc_ref, on="Peak", how="left")
 
-    # --- Normalize using QC reference ---
+    #  Normalize using QC reference 
     samples["Ratio_normalized"] = samples["Intensity_corrected"] / samples[f"{qc_label}_median"]
 
-    # --- Log10-transform normalized ratios ---
+    # Log10-transform normalized ratios 
     samples["Log10_normalized"] = np.log10(samples["Ratio_normalized"] + 1)
 
     print(f" Samples normalized relative to {qc_label}.")
     print(f"Number of samples normalized: {len(samples)}")
     print(f"Number of peaks referenced: {qc_ref.shape[0]}")
-
     return samples
 
 
@@ -1369,13 +1304,12 @@ def extract_and_export_samples(samples, output_path="samples_filtered.csv"):
     pd.DataFrame
         Filtered DataFrame with added 'Variety' column.
     """
-    import pandas as pd
 
-    # --- Extract Variety (last part after the last semicolon) ---
+    # Extract Variety 
     samples = samples.copy()
     samples["Variety"] = samples["Sample"].astype(str).str.split(";").str[-1]
 
-    # --- Filter relevant columns ---
+    # Filter relevant columns 
     keep_cols = [
         "Filename", "Sample", "Peak", "Variety",
         "tR_best", "m/z", "Intensity_corrected",
@@ -1383,7 +1317,7 @@ def extract_and_export_samples(samples, output_path="samples_filtered.csv"):
     ]
     samples_filtered = samples[keep_cols].copy()
 
-    # --- Save to CSV ---
+    # Save 
     samples_filtered.to_csv(output_path, index=False)
     print(f" Filtered samples saved to: {output_path}")
     print(f"Number of rows exported: {len(samples_filtered)}")
@@ -1413,13 +1347,12 @@ def evaluate_normalization_effect(samples, output_path=None):
         }
     """
 
-
-    # --- Compute log10 values before and after normalization ---
+    # compute log10 values before and after normalization 
     samples_plot = samples.copy()
     samples_plot["Log10_before"] = np.log10(samples_plot["Intensity_corrected"] + 1)
     samples_plot["Log10_after"] = np.log10(samples_plot["Ratio_normalized"] + 1)
 
-    # --- Combine for plotting ---
+    #  Combine for plotting
     plot_df = samples_plot.melt(
         value_vars=["Log10_before", "Log10_after"],
         var_name="Stage",
@@ -1431,7 +1364,7 @@ def evaluate_normalization_effect(samples, output_path=None):
         "Log10_after": "After normalization"
     })
 
-    # --- Plot boxplot ---
+    # Plot boxplot 
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=plot_df, x="Stage", y="Log10 Intensity",
                 palette=["salmon", "seagreen"])
@@ -1441,18 +1374,17 @@ def evaluate_normalization_effect(samples, output_path=None):
     plt.grid(axis="y", linestyle="--", alpha=0.4)
     plt.tight_layout()
 
-    # Save plot if requested
+    # Save plot 
     if output_path:
         plt.savefig(output_path, dpi=300)
         print(f" Plot saved to {output_path}")
     else:
         plt.show()
 
-    # --- Compute and print variance reduction ---
+    # Compute and print variance reduction 
     var_before = np.var(np.log10(samples["Intensity_corrected"] + 1))
     var_after = np.var(np.log10(samples["Ratio_normalized"] + 1))
     reduction = (1 - var_after / var_before) * 100
-
     print("\n Normalization Effect Summary")
     print(f"Variance before normalization : {var_before:.6f}")
     print(f"Variance after normalization  : {var_after:.6f}")
@@ -1481,26 +1413,23 @@ def attach_variety_info(samples):
         A cleaned DataFrame containing 'Filename', 'Sample', and 'Variety' columns,
         with duplicate entries removed and consistent column naming.
     """
-    import pandas as pd
 
-    # --- Extract basic sample info ---
+    # Extract sample info 
     sample_info = samples[["Filename", "Sample"]].drop_duplicates().copy()
 
-    # --- Extract Variety (last token after ';') ---
+    # Extract Variety (last token after ';')
     sample_info["Variety"] = sample_info["Sample"].astype(str).str.split(";").str[-1]
 
-    # --- If Variety columns already exist and need merging ---
+    # If Variety columns already exist and need merging 
     if "Variety_x" in samples.columns or "Variety_y" in samples.columns:
         samples = samples.rename(columns={"Variety_x": "Variety"}).drop(
             columns=["Variety_y"], errors="ignore"
         )
 
-    # --- Merge back with main dataset if needed ---
+    # Merge back with main dataset if needed 
     samples_with_variety = samples.merge(sample_info, on=["Filename", "Sample"], how="left")
-
     print(f" Attached 'Variety' information for {samples_with_variety['Variety'].nunique()} varieties.")
     print(f"Total samples with assigned Variety: {len(samples_with_variety)}")
-
     return samples_with_variety
 
 
@@ -1538,16 +1467,10 @@ def perform_pca_interactive_biplot(samples_with_variety,
             "fig": Plotly figure object
         }
     """
-    import pandas as pd
-    import numpy as np
-    from sklearn.impute import SimpleImputer
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.decomposition import PCA
-    import plotly.graph_objects as go
-
+ 
     print("\n Performing PCA (uniform color mode)...")
 
-    # --- Step 1: Pivot to samples × peaks matrix ---
+    # Pivot to samples × peaks matrix 
     X = samples_with_variety.pivot_table(
         index="Filename",
         columns="Peak",
@@ -1555,27 +1478,27 @@ def perform_pca_interactive_biplot(samples_with_variety,
         aggfunc="mean"
     )
 
-    # --- Step 2: Impute missing values ---
+    # Impute missing values 
     imputer = SimpleImputer(strategy="mean")
     X_filled = imputer.fit_transform(X)
 
-    # --- Step 3: Standardize ---
+    # Standardize 
     X_scaled = StandardScaler().fit_transform(X_filled)
 
-    # --- Step 4: PCA ---
+    # PCA 
     pca = PCA(n_components=n_components)
     scores = pca.fit_transform(X_scaled)
 
-    # --- Step 5: Create DataFrame for PCA scores ---
+    # Create DataFrame for PCA scores 
     scores_df = pd.DataFrame(scores, index=X.index, columns=[f"PC{i+1}" for i in range(n_components)]).reset_index()
 
-    # --- Step 6: Compute loadings ---
+    #  Compute loadings 
     loadings = pca.components_.T[:, :2]
     loading_df = pd.DataFrame(loadings, columns=["PC1", "PC2"], index=X.columns)
     loading_df["abs_contrib"] = np.sqrt(loading_df["PC1"]**2 + loading_df["PC2"]**2)
     top_loadings = loading_df.nlargest(top_n_loadings, "abs_contrib")
 
-    # --- Step 7: Build the plot ---
+    # Build the plot 
     fig = go.Figure()
 
     # Add samples (all one color)
@@ -1669,15 +1592,9 @@ def perform_hierarchical_clustering(samples_with_variety,
             "fig": matplotlib Figure object
         }
     """
-    import pandas as pd
-    import numpy as np
-    from sklearn.preprocessing import StandardScaler
-    from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
-    import matplotlib.pyplot as plt
-
     print("\n Performing Hierarchical Clustering...")
 
-    # --- Step 1: Pivot to samples × peaks matrix ---
+    # Pivot to samples × peaks matrix 
     X = samples_with_variety.pivot_table(
         index="Filename",
         columns="Peak",
@@ -1685,14 +1602,14 @@ def perform_hierarchical_clustering(samples_with_variety,
         aggfunc="mean"
     ).fillna(0)
 
-    # --- Step 2: Scale features ---
+    #  Scale features 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # --- Step 3: Compute linkage matrix ---
+    # Compute linkage matrix 
     Z = linkage(X_scaled, method=method)
 
-    # --- Step 4: Assign clusters ---
+    # Assign clusters 
     clusters = fcluster(Z, t=n_clusters, criterion="maxclust")
     cluster_df = pd.DataFrame({
         "Filename": X.index,
@@ -1709,7 +1626,7 @@ def perform_hierarchical_clustering(samples_with_variety,
     print("First few cluster assignments:")
     print(cluster_df.head(10))
 
-    # --- Step 6: Plot dendrogram ---
+    # Plot dendrogram 
     plt.figure(figsize=figsize)
     dendrogram(
         Z,
@@ -1736,7 +1653,7 @@ def evaluate_hierarchical_clustering_full(samples_with_variety,
                                           method="ward",
                                           cluster_range=(2, 10)):
     """
-    📊 Comprehensive Evaluation of Hierarchical Clustering Quality
+     Comprehensive Evaluation of Hierarchical Clustering Quality
     --------------------------------------------------------------
     Computes multiple metrics to assess clustering stability and separation:
     - Cophenetic Correlation (structure preservation)
@@ -1764,21 +1681,9 @@ def evaluate_hierarchical_clustering_full(samples_with_variety,
             "metrics": pd.DataFrame with metrics across cluster counts
         }
     """
-    import pandas as pd
-    import numpy as np
-    from scipy.cluster.hierarchy import linkage, fcluster, cophenet
-    from scipy.spatial.distance import pdist
-    from sklearn.metrics import (
-        silhouette_score,
-        calinski_harabasz_score,
-        davies_bouldin_score
-    )
-    from sklearn.preprocessing import StandardScaler
-    import matplotlib.pyplot as plt
-
     print("\n Evaluating Hierarchical Clustering Across Multiple Metrics...")
 
-    # --- Step 1: Prepare data matrix ---
+    #Prepare data matrix 
     X = samples_with_variety.pivot_table(
         index="Filename",
         columns="Peak",
@@ -1786,15 +1691,15 @@ def evaluate_hierarchical_clustering_full(samples_with_variety,
         aggfunc="mean"
     ).fillna(0)
 
-    # --- Step 2: Scale features ---
+    #Scale features 
     X_scaled = StandardScaler().fit_transform(X)
 
-    # --- Step 3: Compute linkage and cophenetic correlation ---
+    # Compute linkage and cophenetic correlation 
     Z = linkage(X_scaled, method=method)
     coph_corr, _ = cophenet(Z, pdist(X_scaled))
     print(f" Cophenetic correlation coefficient: {coph_corr:.3f}\n")
 
-    # --- Step 4: Evaluate multiple cluster counts ---
+    # Evaluate multiple cluster counts 
     metrics = []
     for k in range(cluster_range[0], cluster_range[1]):
         labels = fcluster(Z, k, criterion="maxclust")
@@ -1813,7 +1718,7 @@ def evaluate_hierarchical_clustering_full(samples_with_variety,
 
     metrics_df = pd.DataFrame(metrics)
 
-    # --- Step 5: Plot all metrics ---
+    # Plot all metrics 
     fig, ax1 = plt.subplots(figsize=(10, 6))
     ax1.plot(metrics_df["Clusters"], metrics_df["Silhouette"], 'o-', label="Silhouette", color="blue")
     ax1.set_ylabel("Silhouette Score", color="blue")
@@ -1842,7 +1747,6 @@ def evaluate_hierarchical_clustering_full(samples_with_variety,
 def plot_pca_clusters(pca_results, clustering_results, optimal_k=2, color_sequence=None):
     """
      Visualize Hierarchical Clustering Results on PCA Plot (Interactive)
-
     This function:
     - Uses PCA scores from `pca_results`
     - Uses the linkage matrix from hierarchical clustering results
@@ -1857,9 +1761,9 @@ def plot_pca_clusters(pca_results, clustering_results, optimal_k=2, color_sequen
     clustering_results : dict
         Output dictionary from the hierarchical clustering evaluation.
         Must contain key: ['linkage_matrix'].
-    optimal_k : int, optional
+    optimal_k : int
         Number of clusters to display (default: 2).
-    color_sequence : list, optional
+    color_sequence : list
         Custom list of colors for the clusters (default: Plotly categorical colors).
 
     Returns
@@ -1867,25 +1771,23 @@ def plot_pca_clusters(pca_results, clustering_results, optimal_k=2, color_sequen
     plotly.graph_objects.Figure
         Interactive PCA scatter plot colored by clusters.
     """
-    import plotly.express as px
-    from scipy.cluster.hierarchy import fcluster
 
     print(f"\n Generating PCA plot with {optimal_k} hierarchical clusters...")
 
-    # --- Step 1: Assign clusters ---
+    #  clusters 
     Z = clustering_results["linkage_matrix"]
     cluster_labels = fcluster(Z, t=optimal_k, criterion="maxclust")
 
-    # --- Step 2: Add cluster info to PCA scores ---
+    #Add cluster info to PCA scores 
     pca_scores = pca_results["scores_df"].copy()
     pca_scores["Cluster"] = cluster_labels
 
-    # --- Step 3: Define colors ---
+    # Define colors
     if color_sequence is None:
         # Default to Plotly palette
         color_sequence = px.colors.qualitative.Set1[:optimal_k]
 
-    # --- Step 4: Create interactive PCA scatter plot ---
+    # Create interactive PCA scatter plot 
     fig = px.scatter(
         pca_scores,
         x="PC1",
