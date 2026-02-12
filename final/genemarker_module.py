@@ -4,7 +4,7 @@ Module: Gene/Marker Analysis Module
 Purpose: Utility functions for preparing, integrating, analysing, and visualising
          genetic marker data alongside potato aroma (VOC) and sensory traits.
 Thesis: Data-Driven Analysis of Potato Aroma and Flavor Using TD-GC-MS and Machine Learning
-Affiliation: Hanze University of Applied Sciences / HZPC (optional)
+Affiliation: Hanze University of Applied Sciences / HZPC 
 """
 
 
@@ -32,10 +32,8 @@ warnings.filterwarnings("ignore", category=ConvergenceWarning)
 from sklearn.metrics import r2_score
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
-from xgboost import XGBRegressor
 from sklearn.model_selection import RandomizedSearchCV, KFold
 from scipy import stats
-from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import time
@@ -161,7 +159,18 @@ def pca_with_feature_contribution(
     target_group=["ALTUS", "FESTIEN", "AVARNA", "ROYAL","DONALD"],
     n_components=5,
 ):
+    """Run PCA on numeric columns, report PC2-driving features, and compute mean feature
+    differences between `target_group` rows and all other rows.
 
+    Returns
+    -------
+    pca_df : DataFrame
+        PC1/PC2 scores per sample.
+    loadings : DataFrame
+        Feature loadings for PCs 1..n_components.
+    difference : Series
+        Mean(target_group) - Mean(others) per feature.
+        """
     # Select only numeric columns
     X = data.select_dtypes(include=[np.number])
     feature_names = X.columns.tolist()
@@ -253,90 +262,10 @@ def plot_pca(pca_df, data, title="PCA of Genetic and Aroma Profiles"):
 
 
 
-def analyze_gene_aroma_plsr(merged_snp_aroma, n_components=2, top_genes=10, top_aromas=20):
-    """
-    Perform Partial Least Squares Regression (PLSR) between genetic markers and aroma compounds.
-    Identifies top influential genes and aroma compounds contributing to the shared variance
-    and visualizes the first component relationship (biplot).
-
-    Parameters
-    ----------
-    merged_snp_aroma : pd.DataFrame
-        Merged dataset containing genetic (columns starting with 'GEN__') and aroma data.
-    n_components : int, default=2
-        Number of PLS components to compute.
-    top_genes : int, default=10
-        Number of top influential genes to display.
-    top_aromas : int, default=20
-        Number of top influential aroma compounds to display.
-
-    Returns
-    -------
-    pls_model : PLSRegression
-        Trained PLSR model.
-    top_genes_df : pd.Series
-        Top influential genes ranked by absolute loading values.
-    top_aromas_df : pd.Series
-        Top influential aroma compounds ranked by absolute loading values.
-    """
-
-    # --- Separate genetic and aroma features ---
-    gene_cols = [c for c in merged_snp_aroma.columns if c.startswith("GEN__")]
-    aroma_cols = [c for c in merged_snp_aroma.columns if not c.startswith("GEN__")]
-
-    gd = merged_snp_aroma[gene_cols].select_dtypes(include=[np.number])
-    A = merged_snp_aroma[aroma_cols].select_dtypes(include=[np.number])
-
-    # Align data
-    common = gd.index.intersection(A.index)
-    X = gd.loc[common]
-    Y = A.loc[common]
-
-    # Standardize 
-    scaler_X = StandardScaler()
-    scaler_Y = StandardScaler()
-    X_scaled = scaler_X.fit_transform(X)
-    Y_scaled = scaler_Y.fit_transform(Y)
-
-    # PLSR
-    pls = PLSRegression(n_components=min(n_components, X.shape[1], Y.shape[1]))
-    pls.fit(X_scaled, Y_scaled)
-
-    # Gene influence 
-    gene_loadings = pd.Series(pls.x_loadings_[:, 0], index=X.columns)
-    top_genes_df = gene_loadings.abs().sort_values(ascending=False).head(top_genes)
-    print("Top Influential Genes:\n", top_genes_df)
-
-    # Aroma influence 
-    aroma_loadings = pd.Series(pls.y_loadings_[:, 0], index=Y.columns)
-    top_aromas_df = aroma_loadings.abs().sort_values(ascending=False).head(top_aromas)
-    print("\nTop Influential Aroma Compounds:\n", top_aromas_df)
-
-    # Biplot 
-    plt.figure(figsize=(8, 6))
-    plt.scatter(pls.x_scores_[:, 0], pls.y_scores_[:, 0], alpha=0.7)
-    plt.xlabel("PLS Component 1 (Genes)")
-    plt.ylabel("PLS Component 1 (Aromas)")
-    plt.title("PLSR Biplot: Genetic–Aroma Relationship in Potato Varieties", fontsize=13, weight="bold")
-    plt.grid(False)
-
-    # Label varieties
-    for i, name in enumerate(common):
-        plt.text(pls.x_scores_[i, 0], pls.y_scores_[i, 0], name, fontsize=8, color="darkblue")
-    plt.tight_layout()
-    plt.show()
-
-    print(f"\nExplained variance (X, Y): {pls.x_weights_.shape}, {pls.y_weights_.shape}")
-    print(f"Number of varieties analyzed: {len(common)}")
-    return pls, top_genes_df, top_aromas_df
-
-
-
-
 def plot_top_aroma_loadings_horizontal(top_aromas_df, title="Top 20 Aroma Compounds Influencing PLS Component 1"):
     """
     Plot top aroma compounds influencing PLS Component 1 (horizontal bar chart).
-    Matches the style shown in your example image.
+    Matches the style shown in  example image.
     """
     plt.figure(figsize=(7, 5))
     
@@ -366,7 +295,6 @@ def plot_top_aroma_loadings_horizontal(top_aromas_df, title="Top 20 Aroma Compou
     plt.grid(axis="x", linestyle="--", alpha=0.5)
     plt.tight_layout()
     plt.show()
-
 
 
 
@@ -442,7 +370,6 @@ def perform_gwas_lmm_for_traits_fast(
 
   
     #  SNP QC: missingness filter
- 
     log("Stage 3/9: SNP QC (missingness / impute / monomorphic / MAF)")
     miss = np.isnan(X).mean(axis=0)
     keep = miss <= float(missing_max)
@@ -596,7 +523,6 @@ def perform_gwas_lmm_for_traits_fast(
 
 
     #  GWAS per trait
-
     log("Stage 7/9: GWAS trait loop")
     all_out = []
 
@@ -815,6 +741,8 @@ def perform_gwas_lmm_for_traits_fast(
         log(f"Stage 9/9: Saved results -> {output_path}")
 
     return all_gwas_df
+
+
 
 
 
@@ -1172,184 +1100,6 @@ def plot_sensory_profiles_of_pca_outliers(results, sensory_reconstructed_df):
 
 
 
-def plot_manhattan_like_gwas(gwas_path):
-    """
-    Generate a Manhattan-like scatter plot for sensory GWAS results (without chromosome info).
-
-    Parameters
-    ----------
-    gwas_path : str
-        Path to the GWAS results CSV file. The file must contain at least:
-        - 'p_fdr' : FDR-adjusted p-values
-        - 'Trait' : corresponding sensory traits
-
-    Returns
-    -------
-    None
-        Displays a scatter plot of GWAS markers ranked by significance (-log10 FDR-adjusted p-value).
-    """
-
-    #  Load GWAS results
-    gwas_df = pd.read_csv(gwas_path)
-
-    # Basic column check
-    required_cols = {"p_fdr", "Trait"}
-    if not required_cols.issubset(gwas_df.columns):
-        raise ValueError(f"Input file must contain columns: {required_cols}")
-
-    #  Sort by significance 
-    gwas_df = gwas_df.sort_values("p_fdr").reset_index(drop=True)
-
-    #  Create figure 
-    plt.figure(figsize=(14, 6))
-    sns.scatterplot(
-        data=gwas_df,
-        x=np.arange(len(gwas_df)),
-        y=-np.log10(gwas_df["p_fdr"]),
-        hue="Trait",
-        palette="tab10",
-        s=25,
-        alpha=0.7
-    )
-
-    #  Add significance thresholds 
-    plt.axhline(-np.log10(0.05), color="red", linestyle="--", linewidth=1.2, label="FDR = 0.05")
-
-    # Add text note if no significant SNPs
-    n_sig = (gwas_df["p_fdr"] < 0.05).sum()
-    # Formatting 
-    plt.title("Marker-Based Manhattan Plot for Sensory GWAS PCs", fontsize=14, pad=15)
-    plt.xlabel("Gene / Marker (SNP, sorted by p-value)", fontsize=11)
-    plt.ylabel("-log10(FDR-adjusted p-value)", fontsize=11)
-    plt.legend(title="Trait", bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.tight_layout()
-    plt.show()
-
-
-
-
-def plot_gwas_volcano(gwas_path, fdr_threshold=0.1):
-    """
-    Generate a Volcano Plot for GWAS of sensory principal components.
-
-    Parameters
-    ----------
-    gwas_path : str
-        Path to the GWAS results CSV file. The file must contain:
-        - 'p_fdr' : FDR-adjusted p-values
-        - 'Trait' : corresponding trait label
-        - 'effect_size' : estimated SNP effect sizes (optional)
-    fdr_threshold : float, optional
-        Significance cutoff for drawing the horizontal threshold line (default: 0.1).
-
-    Returns
-    -------
-    None
-        Displays a volcano plot with effect size vs -log10(FDR-adjusted p-value).
-
-    Notes
-    -----
-    The volcano plot visualizes SNP effect size (x-axis) versus statistical significance
-    (-log10 FDR-adjusted p-value). Points above the red dashed line indicate SNPs
-    with FDR < threshold, suggesting stronger associations.
-    """
-
-    # Load GWAS results
-    gwas_df = pd.read_csv(gwas_path)
-
-    # validation 
-    required_cols = {"p_fdr", "Trait"}
-    if not required_cols.issubset(gwas_df.columns):
-        raise ValueError(f"Input file must contain columns: {required_cols}")
-
-    #  Add mock effect size if not present 
-    if "effect_size" not in gwas_df.columns:
-        np.random.seed(42)
-        gwas_df["effect_size"] = np.random.normal(0, 1, len(gwas_df))
-        print(" 'effect_size' column not found — generated random values for visualization.")
-
-    #  Sort for better visual layering 
-    gwas_df = gwas_df.sort_values("p_fdr").reset_index(drop=True)
-
-    # Create Volcano Plot 
-    plt.figure(figsize=(8, 6))
-    sns.scatterplot(
-        data=gwas_df,
-        x="effect_size",
-        y=-np.log10(gwas_df["p_fdr"]),
-        hue="Trait",
-        palette="Set2",
-        s=25,
-        alpha=0.8
-    )
-
-    #  Significance threshold line
-    plt.axhline(
-        -np.log10(fdr_threshold),
-        color="red",
-        linestyle="--",
-        linewidth=1.2,
-        label=f"FDR = {fdr_threshold}"
-    )
-
-    # Styling and labels
-    plt.title("Volcano Plot for Sensory GWAS Principal Components", fontsize=14, weight="bold")
-    plt.xlabel("Effect Size", fontsize=12)
-    plt.ylabel("−log10(FDR-adjusted p-value)", fontsize=12)
-    plt.legend(title="Trait", bbox_to_anchor=(1.02, 1), loc="upper left", frameon=False)
-    plt.tight_layout()
-    plt.show()
-
-
-
-def plot_gwas_qq(gwas_df, pval_col="p_value"):
-    """
-    Generate a QQ (Quantile–Quantile) plot to assess GWAS p-value distribution.
-
-    Parameters
-    ----------
-    gwas_df : pandas.DataFrame
-        DataFrame containing GWAS results with a p-value column.
-    pval_col : str, optional
-        Column name for raw p-values (default: "p_value").
-
-    Returns
-    -------
-    None
-        Displays a QQ plot comparing observed vs expected -log10(p) values.
-
-    Notes
-    -----
-    The QQ plot helps evaluate whether the distribution of observed GWAS p-values
-    deviates from the null expectation. Points along the red dashed line indicate
-    well-calibrated p-values (no inflation or deflation).
-    """
-
-    #  Validate input
-    if pval_col not in gwas_df.columns:
-        raise ValueError(f"'{pval_col}' column not found in DataFrame.")
-
-    #  Clean p-values 
-    pvals = gwas_df[pval_col].replace(0, np.nan).dropna()
-    if pvals.empty:
-        raise ValueError("No valid p-values found after removing NaNs and zeros.")
-
-    #  Expected and observed -log10(p) 
-    expected = -np.log10(np.linspace(1 / len(pvals), 1, len(pvals)))
-    observed = -np.log10(np.sort(pvals))
-
-    #  Plot 
-    plt.figure(figsize=(6, 6))
-    sns.scatterplot(x=expected, y=observed, s=15, color="darkslateblue", alpha=0.7)
-    plt.plot([0, max(expected)], [0, max(expected)], color="red", linestyle="--", linewidth=1)
-
-    #  Formatting 
-    plt.title("QQ Plot for Sensory GWAS Principal Components", fontsize=14, weight="bold")
-    plt.xlabel("Expected -log10(p)", fontsize=12)
-    plt.ylabel("Observed -log10(p)", fontsize=12)
-    plt.tight_layout()
-    plt.show()
-
 
 def _acat_pvalue(pvals, weights=None):
     """
@@ -1492,9 +1242,6 @@ def run_gwas_multitrait_with_population_structure(
     precompute_UX: bool = True,
     verbose: bool = True
 ):
-    """
-    Thin wrapper with your preferred function name.
-    """
     return perform_gwas_lmm_multitrait_acat_fast(
         merged_df=merged_df,
         traits=traits,
@@ -1510,6 +1257,9 @@ def run_gwas_multitrait_with_population_structure(
         precompute_UX=precompute_UX,
         verbose=verbose
     )
+
+
+
 
 
 # Helpers
@@ -1600,8 +1350,6 @@ def _cv_std_for_best(search_obj):
         return float(search_obj.cv_results_["std_test_score"][idx])
     except Exception:
         return np.nan
-
-
 
 
 def evaluate_regression(y_true, y_pred):
@@ -1726,7 +1474,7 @@ def run_linear_models_cv_nested_light(
 
 
 
-def run_linear_models_independent_generalisation(
+def run_linear_models_independent_generalisation_with_params(
     df_linear_cv,
     gwas_file,
     snp_train,
@@ -1734,8 +1482,6 @@ def run_linear_models_independent_generalisation(
     n_snps=300,
     prune_threshold=0.95
 ):
-
-    #  Select best model per trait (from CV)
     best_models = (
         df_linear_cv
         .sort_values("CV_R2", ascending=False)
@@ -1745,25 +1491,15 @@ def run_linear_models_independent_generalisation(
 
     gwas = pd.read_csv(gwas_file)
 
-    MODEL_MAP = {
-        "OLS": LinearRegression,
-        "Ridge": Ridge,
-        "Lasso": Lasso,
-        "ElasticNet": ElasticNet
-    }
-
     results = []
 
-    #  Evaluate on independent data
     for _, row in best_models.iterrows():
-
         trait = row["Trait"]
         model_name = row["Model"]
 
         if trait not in snp_train.columns or trait not in snp_indep.columns:
             continue
 
-        #  SNP prioritisation from GWAS (TRAIN only)
         ranked_snps = (
             gwas[gwas["Trait"] == trait]
             .sort_values("p_fdr")["SNP"]
@@ -1776,29 +1512,37 @@ def run_linear_models_independent_generalisation(
         y_tr = snp_train[trait].astype(float).values
         y_te = snp_indep[trait].astype(float).values
 
-        #  LD pruning (TRAIN only)
         X_tr = ld_prune(X_tr, threshold=prune_threshold)
         X_te = X_te[X_tr.columns]
 
         if X_tr.shape[1] < 20:
             continue
 
-        #  Scaling
         scaler = StandardScaler()
         X_tr = scaler.fit_transform(X_tr)
         X_te = scaler.transform(X_te)
 
-        # Train final selected model
-        ModelCls = MODEL_MAP[model_name]
-
+        # build model with best params (if present)
         if model_name == "OLS":
-            model = ModelCls()
+            model = LinearRegression()
+
+        elif model_name == "Ridge":
+            alpha = row.get("alpha", 1.0)
+            model = Ridge(alpha=float(alpha), max_iter=200000)
+
+        elif model_name == "Lasso":
+            alpha = row.get("alpha", 0.01)
+            model = Lasso(alpha=float(alpha), max_iter=200000)
+
+        elif model_name == "ElasticNet":
+            alpha = row.get("alpha", 0.1)
+            l1_ratio = row.get("l1_ratio", 0.5)
+            model = ElasticNet(alpha=float(alpha), l1_ratio=float(l1_ratio), max_iter=200000)
+
         else:
-            model = ModelCls(max_iter=200000)
+            continue
 
         model.fit(X_tr, y_tr)
-
-        #  Predict independent dataset
         y_pred = model.predict(X_te)
 
         results.append({
@@ -1885,8 +1629,6 @@ def run_krr_models_cv_nested_light(
             })
 
     return pd.DataFrame(results)
-
-
 
 
 
@@ -1996,7 +1738,6 @@ def run_nonlinear_models_cv_nested_light(
                 })
 
     return pd.DataFrame(results)
-
 
 
 
@@ -2383,8 +2124,6 @@ def analyze_marker_effects_for_top_correlated_traits(
     )
     # Store outputs
     all_effects = {}
-
-
     #  Compute SNP effects via Linear Regression
     for trait, top_snps in important_genes.items():
         print(f"\n Analyzing {trait} ({len(top_snps)} SNPs)...")
@@ -2637,6 +2376,8 @@ def prepare_plsr_data(predictions, high_r2_traits, sensory_reconstructed_path):
     )
     print(f"X_scaled shape: {X_scaled.shape}, Y_scaled shape: {Y_scaled.shape}")
     return X, Y, X_scaled, Y_scaled
+
+
 
 
 def plot_plsr_biplot(
