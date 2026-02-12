@@ -57,8 +57,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 import plotly.express as px
 from statsmodels.nonparametric.smoothers_lowess import lowess
+from plotly.subplots import make_subplots
 
- 
 
 def read_qc_file(file_path, sheet_index=0, header_row=12, preview_rows=5):
     """
@@ -518,123 +518,155 @@ def evaluate_qc_linearity(alkane_matches, df_qc):
 
 def launch_qc_linearity_dashboard(df_qc, results_df, port=8040):
     """
-    Launches an interactive Dash dashboard showing QC linearity trends
-    across different days and compounds.
-
-    The dashboard:
-      - Lets the user select a Day.
-      - Displays subplots showing observed vs predicted intensities
-        across QC concentration levels.
-      - Fits a linear regression model for each compound/peak combination.
+    Launch an interactive Dash dashboard to visualize QC linearity per day.
 
     Parameters
     ----------
     df_qc : pd.DataFrame
-        Long-format QC data (from `merge_qc_with_master`).
+        Long-format QC data. Must contain at least: ['Day', 'Peak', 'Sample', 'Intensity'].
     results_df : pd.DataFrame
-        DataFrame of linearity results (from `evaluate_qc_linearity`).
-    port : int, optional
-        Port to run the dashboard on (default = 8040).
+        Linearity results per compound/peak/day. Must contain at least: ['Day', 'Peak', 'Compound'].
+    port : int, default=8040
+        Port to run the dashboard.
     """
-    # Define QC concentration mapping
-    qc_concentrations = {
-        "QC1": 312.5,
-        "QC2": 625,
-        "QC3": 1250,
-        "QC4": 2500
-    }
+    qc_concentrations = {"QC1": 312.5, "QC2": 625, "QC3": 1250, "QC4": 2500}
 
-    # Initialize Dash app 
+    # Basic sanity checks (fail fast, clearer errors)
+    required_qc = {"Day", "Peak", "Sample", "Intensity"}
+    required_res = {"Day", "Peak", "Compound"}
+    missing_qc = required_qc - set(df_qc.columns)
+    missing_res = required_res - set(results_df.columns)
+    if missing_qc:
+        raise ValueError(f"df_qc missing columns: {missing_qc}")
+    if missing_res:
+        raise ValueError(f"results_df missing columns: {missing_res}")
+
+    # Clean Day values
+    days = sorted(pd.Series(df_qc["Day"].dropna().unique()).tolist())
+    if not days:
+        raise ValueError("df_qc has no valid 'Day' values.")
+
     app = Dash(__name__)
     app.title = "QC Linear Trend Dashboard"
 
-    app.layout = html.Div([
-        html.H1("QC Linear Trend Dashboard", style={"textAlign": "center"}),
+    app.layout = html.Div(
+        [
+            html.H1("QC Linear Trend Dashboard", style={"textAlign": "center"}),
 
-        html.Div([
-            html.Label("Select Day:"),
-            dcc.Dropdown(
-                id="day-dropdown",
-                options=[{"label": str(day), "value": day} for day in sorted(df_qc["Day"].unique())],
-                value=sorted(df_qc["Day"].unique())[0],
-                clearable=False
-            )
-        ], style={"width": "40%", "margin": "auto"}),
-        dcc.Graph(id="qc-trend-plots", style={"marginTop": "30px"})
-    ])
+            html.Div(
+                [
+                    html.Label("Select Day:"),
+                    dcc.Dropdown(
+                        id="day-dropdown",
+                        options=[{"label": str(day), "value": day} for day in days],
+                        value=days[0],
+                        clearable=False,
+                    ),
+                ],
+                style={"width": "40%", "margin": "auto"},
+            ),
 
-    # Define callback for interactivity 
-    @app.callback(
-        Output("qc-trend-plots", "figure"),
-        Input("day-dropdown", "value")
+            dcc.Graph(id="qc-trend-plots", style={"marginTop": "30px"}),
+        ]
     )
-    def update_plots(selected_day):
-        day_results = results_df[results_df["Day"] == selected_day]
 
-        subplot_titles = []
+    @app.callback(Output("qc-trend-plots", "figure"), Input("day-dropdown", "value"))
+    def update_plots(selected_day):
+        day_results = results_df[results_df["Day"] == selected_day].copy()
+
+        if day_results.empty:
+            fig = go.Figure()
+            fig.update_layout(title=f"No results for Day {selected_day}")
+            return fig
+
+        # Optional: limit number of panels for readability/performance
+        day_results = day_results.head(9)
+
         traces = []
+        subplot_titles = []
 
         for _, row_data in day_results.iterrows():
-            sub = df_qc[(df_qc["Peak"] == row_data["Peak"]) &
-                        (df_qc["Day"] == selected_day)].copy()
-            sub["QC_label"] = sub["Sample"].str.extract(r"(QC\d+)")
+            peak = row_data["Peak"]
+
+            sub = df_qc[(df_qc["Peak"] == peak) & (df_qc["Day"] == selected_day)].copy()
+            if sub.empty:
+                continue
+
+            sub["QC_label"] = sub["Sample"].astype(str).str.extract(r"(QC\d+)")
             sub["Concentration"] = sub["QC_label"].map(qc_concentrations)
 
-            X = sub["Concentration"].values.reshape(-1, 1)
-            y = sub["Intensity"].values
-            if len(sub) > 1:
+            sub = sub.dropna(subset=["Concentration", "Intensity"])
+            if sub.empty:
+                continue
+
+            X = sub["Concentration"].to_numpy(dtype=float).reshape(-1, 1)
+            y = sub["Intensity"].to_numpy(dtype=float)
+
+            if len(sub) > 1 and np.nanstd(y) > 0:
                 model = LinearRegression().fit(X, y)
-                y_pred = model.predict(X)
                 r2 = model.score(X, y)
+
+                # sort by x so the fitted line is not zig-zag
+                order = np.argsort(sub["Concentration"].to_numpy(dtype=float))
+                x_sorted = sub["Concentration"].to_numpy(dtype=float)[order]
+                y_sorted = y[order]
+                y_pred_sorted = model.predict(x_sorted.reshape(-1, 1))
             else:
-                y_pred = y
                 r2 = np.nan
+                order = np.argsort(sub["Concentration"].to_numpy(dtype=float))
+                x_sorted = sub["Concentration"].to_numpy(dtype=float)[order]
+                y_sorted = y[order]
+                y_pred_sorted = y_sorted
 
             subplot_titles.append(
-                f"{row_data['Compound']} (Peak {int(row_data['Peak'])}, R²={r2:.2f})"
+                f"{row_data['Compound']} (Peak {int(peak)}, R²={r2:.2f})"
+                if np.isfinite(r2)
+                else f"{row_data['Compound']} (Peak {int(peak)}, R²=NA)"
             )
-            traces.append((sub["Concentration"], y, y_pred, row_data))
-        # Create grid layout (3x3)
-        fig = make_subplots(rows=3, cols=3, subplot_titles=subplot_titles)
+
+            traces.append((x_sorted, y_sorted, y_pred_sorted, row_data))
+
+        if not traces:
+            fig = go.Figure()
+            fig.update_layout(title=f"No plottable QC data for Day {selected_day}")
+            return fig
+
+        # grid size (up to 9 panels)
+        n_panels = len(traces)
+        n_cols = 3
+        n_rows = int(np.ceil(n_panels / n_cols))
+
+        fig = make_subplots(rows=n_rows, cols=n_cols, subplot_titles=subplot_titles)
+
         row_idx, col_idx = 1, 1
         for x_vals, y_vals, y_pred, row_data in traces:
             fig.add_trace(
-                go.Scatter(
-                    x=x_vals, y=y_vals, mode="markers",
-                    name=f"{row_data['Compound']} Peak {int(row_data['Peak'])} obs"
-                ),
-                row=row_idx, col=col_idx
+                go.Scatter(x=x_vals, y=y_vals, mode="markers"),
+                row=row_idx, col=col_idx,
             )
             fig.add_trace(
-                go.Scatter(
-                    x=x_vals, y=y_pred, mode="lines",
-                    name=f"{row_data['Compound']} Peak {int(row_data['Peak'])} fit"
-                ),
-                row=row_idx, col=col_idx
+                go.Scatter(x=x_vals, y=y_pred, mode="lines"),
+                row=row_idx, col=col_idx,
             )
 
             fig.update_xaxes(title_text="Concentration (pg/µL)", row=row_idx, col=col_idx)
             fig.update_yaxes(title_text="Intensity", row=row_idx, col=col_idx)
 
             col_idx += 1
-            if col_idx > 3:
+            if col_idx > n_cols:
                 col_idx = 1
                 row_idx += 1
+
         fig.update_layout(
-            height=850,
+            height=320 * n_rows + 200,
             width=1100,
             title_text=f"QC Linear Trends – Day {selected_day}",
-            showlegend=False
+            showlegend=False,
         )
-
         return fig
-    #  Run the dashboard 
-    print(f" Launching QC Linear Trend Dashboard at http://127.0.0.1:{port}")
+
+    print(f"Launching QC Linear Trend Dashboard at http://127.0.0.1:{port}")
     app.run(debug=True, port=port)
-
-
-
-
 
 
 def filter_stable_peaks_by_r2(results_df, r2_threshold=0.9):
@@ -663,56 +695,6 @@ def filter_stable_peaks_by_r2(results_df, r2_threshold=0.9):
     print(stable_peaks[["Day", "Compound", "Peak", "tR_best", "m/z", "R2"]])
 
     return stable_peaks
-
-
-
-
-
-
-def perform_anova_on_qc_peaks(df_qc, results_df):
-    """
-    Performs one-way ANOVA across different days for each compound/peak
-    to assess QC intensity reproducibility.
-
-    Parameters
-    ----------
-    df_qc : pd.DataFrame
-        Long-format QC data containing at least:
-        ['Peak', 'tR_best', 'm/z', 'Day', 'Intensity'].
-    results_df : pd.DataFrame
-        DataFrame with 'Compound' and 'Peak' columns from evaluate_qc_linearity().
-
-    Returns
-    -------
-    pd.DataFrame
-        ANOVA results table with:
-        ['Compound', 'Peak', 'tR_best', 'm/z', 'ANOVA_F', 'ANOVA_p'].
-    """
-    anova_results = []
-    # Iterate over all compound-peak combinations
-    for compound in results_df["Compound"].unique():
-        peak_ids = results_df.loc[results_df["Compound"] == compound, "Peak"].unique()
-
-        for peak in peak_ids:
-            sub = df_qc[df_qc["Peak"] == peak]
-            # Group intensities by day
-            groups = [group["Intensity"].values for _, group in sub.groupby("Day")]
-
-            # Perform ANOVA only if ≥ 2 days of data exist
-            if len(groups) > 1:
-                f_stat, p_val = f_oneway(*groups)
-                anova_results.append({
-                    "Compound": compound,
-                    "Peak": int(peak),
-                    "tR_best": sub["tR_best"].iloc[0],
-                    "m/z": sub["m/z"].iloc[0],
-                    "ANOVA_F": f_stat,
-                    "ANOVA_p": p_val
-                })
-    anova_df = pd.DataFrame(anova_results)
-    print(f" ANOVA completed for {len(anova_df)} peaks across days.")
-    print(f"Significant (p<0.05): {(anova_df['ANOVA_p'] < 0.05).sum()} peaks")
-    return anova_df
 
 
 
@@ -879,7 +861,8 @@ def plot_alkane_stability_colored(df_qc, stable_peaks, qc_levels=None, r2_thresh
 
 
 
-def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, config_path, loess_frac=0.3):
+def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, config_path, loess_frac=0.3, dataset_key="biorep1"):
+
     """
     Applies LOESS-based global drift correction using alkane QC peaks.
     Shows before/after evaluation as boxplots (no per-peak metrics).
@@ -910,11 +893,15 @@ def apply_alkane_drift_correction_global(df_qc, selected_data, stable_peaks, con
     #  Load master table from config 
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
-    master_path = config.get("qc_merge", {}).get("master_path", config.get("master_path"))
-    if not master_path:
-        raise KeyError(" master_path not found in config YAML.")
-    print(f" Loaded master table from: {master_path}")
-    master_table = pd.read_csv(master_path)
+
+        try:
+            master_path = config[dataset_key]["qc_merge"]["master_path"]
+        except KeyError:
+            raise KeyError(f"master_path not found at config['{dataset_key}']['qc_merge']['master_path']")
+
+        print(f"Loaded master table from: {master_path}")
+        master_table = pd.read_csv(master_path)   # <-- REQUIRED
+
 
     #  Estimate drift from alkane QCs 
     alkane_ids = stable_peaks["Peak"].unique()
