@@ -47,8 +47,8 @@ All notebooks read from `config.yaml`, which centralises:
 This step transforms raw MsMetrix peak tables into clean, analysis-ready intensity tables.
 
 **Notebooks**
-- `final_data_prepration_biorep1.ipynb`
-- `final_data_prepration_biorep2.ipynb`
+- `final_data_preparation_biorep1.ipynb`
+- `final_data_preparation_biorep2.ipynb`
 
 **Module**
 - `datapreparation_module.py`
