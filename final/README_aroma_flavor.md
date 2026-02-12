@@ -1,7 +1,7 @@
 # Potato Aroma & Flavor (TD–GC–MS) Pipeline — Biorep1 + Biorep2
 
 ## 1) Overview
-This project implements a **config-driven** workflow for **potato aroma and flavor analysis** using **TD–GC–MS** data, with optional integration of **sensory profiling** and **genetic marker (taglo/SNP) data**. The pipeline is designed to be reusable for  **thesis work**, and is executed for two independent batches:
+This project implements a **config-driven** workflow for **potato aroma and flavor analysis** using **TD–GC–MS** data, with integration of **sensory profiling** and **genetic marker (taglo/SNP) data**. The pipeline is designed to be reusable for  **thesis work**, and is executed for two independent batches:
 
 - **Biorep1** — development batch (main analysis)
 - **Biorep2** — independent batch validation (generalisation check)
@@ -14,7 +14,7 @@ Core engineering challenges addressed:
 - contamination filtering using blank/environment/QC references
 - aroma matrix construction (Variety × Compound)
 - multivariate analysis (PCA/clustering)
-- GWAS-style association analysis and SNP/taglo prioritisation (single-trait and multi-trait)
+- GWAS-style association analysis and SNP prioritisation (single-trait and multi-trait)
 -  predictive modelling
 - genotype × VOC × sensory integration 
 
@@ -39,7 +39,7 @@ All notebooks read from `config.yaml`, which centralises:
 - output paths (CSV exports, figures)
 - parameters (e.g., retention-time tolerance, clustering settings)
 
-**Config file:** `config.yaml`
+'Config file': `config.yaml`. It defines paths for both datasets: biorep1 as the main (training) dataset and biorep2 as the independent batch dataset. I included paths for both so the pipeline can be run separately on each dataset and the results can be compared. Both datasets can be replaced with other datasets by updating the paths in the config file.
 
 ---
 
@@ -120,7 +120,7 @@ This step merges genetic markers with aroma phenotypes (and optionally sensory) 
 
 ## 4) Execution
 
-### Run order (recommended)
+### Run order 
 
 **Biorep1**
 1. `final_data_prepration_biorep1.ipynb`
