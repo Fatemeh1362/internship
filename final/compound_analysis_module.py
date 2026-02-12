@@ -42,7 +42,6 @@ What this module supports (high level)
 
 5) Aroma chemistry interpretation helpers
    - Assign chemical families (e.g., Aldehyde, Alcohol, Ketone, Sulfur, Ester, Acid, Pyrazine)
-   - Assign aroma descriptions (curated where available; otherwise family-based defaults)
    - Summarise chemical-family distributions
 
 6) Multivariate analysis & clustering
@@ -52,28 +51,21 @@ What this module supports (high level)
    - Feature importance interpretation from PCA loadings
 
 7) Sensory integration
-   - Clean and summarise sensory traits per Variety
    - Merge aroma matrices with sensory summaries (Variety alignment/normalisation)
-   - Downstream correlation / prediction utilities (where used in notebooks)
+   - Downstream correlation / sensory scores estiamtion for non panel varaities
 """
 
 from __future__ import annotations
 
 #  library
 import os
-import glob
-import json
-import warnings
 from typing import Optional, Tuple, Dict, List
-from sklearn.model_selection import RandomizedSearchCV
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 from difflib import get_close_matches
 from scipy.spatial import distance
-
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
@@ -92,8 +84,11 @@ from matplotlib.patches import Ellipse
 import re
 from difflib import get_close_matches
 from collections import OrderedDict, defaultdict
-from typing import List, Dict, Tuple
-
+from sklearn.mixture import GaussianMixture
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+from sklearn.manifold import TSNE
+from scipy.spatial import distance, ConvexHull
+from matplotlib.patches import Ellipse
 
 
 
@@ -263,68 +258,6 @@ def plot_filtering_effect(compound_df: pd.DataFrame, real_compounds: pd.DataFram
     plt.show()
     print(f"Before: {before}, After: {after}")
 
-
-#  Matching compounds to peaks + aroma extraction
-def match_compounds_to_peaks(
-    compound_df: pd.DataFrame,
-    samples_filtered_path: str,
-    output_path: str,
-    rt_tolerance: float = 0.4
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Match NIST-identified compounds with GC–MS peaks based on retention time (RT).
-    Expects samples_filtered CSV has columns: Variety, Peak, tR_best, m/z, Intensity_corrected
-    """
-
-    samples_filtered = pd.read_csv(samples_filtered_path)
-
-    # Create Variety from FileName
-    compound_df = compound_df.copy()
-    compound_df["Variety"] = compound_df["FileName"].astype(str).str.replace(".csv", "", regex=False).str.strip()
-
-    def find_closest_peak(rt, peaks_rt, tol=rt_tolerance):
-        diffs = np.abs(peaks_rt - rt)
-        if diffs.empty:
-            return None
-        min_diff = diffs.min()
-        return diffs.idxmin() if min_diff <= tol else None
-
-    matches, unmatched = [], []
-
-    for _, row in compound_df.iterrows():
-        variety = row["Variety"]
-        sample_data = samples_filtered[samples_filtered["Variety"] == variety]
-        if sample_data.empty:
-            unmatched.append({**row, "Reason": "No rows for this variety"})
-            continue
-
-        compound_rt = row.get("Component RT", np.nan)
-        peak_idx = find_closest_peak(compound_rt, sample_data["tR_best"], tol=rt_tolerance)
-
-        if peak_idx is None:
-            unmatched.append({**row, "Reason": "No matching RT"})
-            continue
-
-        peak_row = sample_data.loc[peak_idx]
-        matches.append({
-            "Compound Name": row.get("Compound Name"),
-            "FileName": row.get("FileName"),
-            "Variety": variety,
-            "Component RT": compound_rt,
-            "Peak": peak_row.get("Peak"),
-            "tR_best": peak_row.get("tR_best"),
-            "m/z": peak_row.get("m/z"),
-            "Intensity": peak_row.get("Intensity_corrected", peak_row.get("Intensity", np.nan)),
-        })
-
-    compound_intensity_df = pd.DataFrame(matches)
-    unmatched_df = pd.DataFrame(unmatched)
-
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    compound_intensity_df.to_csv(output_path, index=False)
-    print(f"\nMatched compounds saved to: {output_path}")
-
-    return compound_intensity_df, unmatched_df
 
 
 
@@ -579,7 +512,7 @@ def match_potato_aromas_strict(
         if c not in peaks_raw.columns:
             raise KeyError(f"peaks must contain '{c}'. Available: {peaks_raw.columns.tolist()}")
 
-    long_int_candidates = ["Intensity_corrected", "Intensity", "Area", "peak_Intensity"]
+    long_int_candidates = ["Intensity_corrected"]
     id_candidates = ["Variety", "Filename", "Sample", "SampleCol"]
 
     is_long = any(c in peaks_raw.columns for c in long_int_candidates) and any(
@@ -1177,10 +1110,7 @@ def plot_outlier_vs_normal_aromas(aroma_matrix, outliers, chemical_family_map, o
 
 
 
-
-
 #  Matrices + clustering (PCA/KMeans, PCA/GMM)
-
 def create_aroma_intensity_matrix(aroma_sample_df: pd.DataFrame) -> pd.DataFrame:
     """
     Creates Variety × Compound matrix using mean intensity.
@@ -1200,7 +1130,6 @@ def create_aroma_intensity_matrix(aroma_sample_df: pd.DataFrame) -> pd.DataFrame
     aroma_pivot.columns.name = None
     print(f"Aroma matrix shape: {aroma_pivot.shape}")
     return aroma_pivot
-
 
 
 
@@ -1254,7 +1183,6 @@ def pca_kmeans_aroma(
     kmeans = KMeans(n_clusters=best_k, random_state=42, n_init=10)
     cluster_labels = kmeans.fit_predict(X_pca)
     centers = kmeans.cluster_centers_
-
     results = pd.DataFrame({
         "Variety": varieties,
         "Cluster": cluster_labels,
@@ -1311,10 +1239,7 @@ def pca_kmeans_aroma(
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "pca_kmeans_clusters.png"), dpi=300)
     plt.show()
-
     return results, X_pca, cluster_labels
-
-
 
 
 
@@ -1328,23 +1253,70 @@ def analyze_aroma_clusters_gmm(
 ):
     """
     PCA (90% var) + GMM + metrics + outlier detection
+    + Outlier labels on plots
+    + Cluster boundaries (ellipse or convex hull)
     """
     os.makedirs(output_dir, exist_ok=True)
+    # Helpers (inside function)
 
+    def _draw_cov_ellipse(ax, pts, n_std=2.0, **kwargs):
+        """Draw covariance ellipse around 2D points."""
+        if pts.shape[0] < 3:
+            return
+        mean = pts.mean(axis=0)
+        cov = np.cov(pts, rowvar=False)
+
+        vals, vecs = np.linalg.eigh(cov)
+        order = vals.argsort()[::-1]
+        vals, vecs = vals[order], vecs[:, order]
+
+        angle = np.degrees(np.arctan2(vecs[1, 0], vecs[0, 0]))
+        width, height = 2 * n_std * np.sqrt(vals)
+
+        ell = Ellipse(xy=mean, width=width, height=height, angle=angle, fill=False, **kwargs)
+        ax.add_patch(ell)
+
+    def _draw_convex_hull(ax, pts, **kwargs):
+        """Draw convex hull boundary around 2D points."""
+        if pts.shape[0] < 3:
+            return
+        hull = ConvexHull(pts)
+        hull_pts = pts[hull.vertices]
+        hull_pts = np.vstack([hull_pts, hull_pts[0]])
+        ax.plot(hull_pts[:, 0], hull_pts[:, 1], **kwargs)
+
+    def _label_points(ax, xs, ys, labels, fontsize=9):
+        """Label points with a small offset."""
+        for x, y, lab in zip(xs, ys, labels):
+            ax.annotate(
+                str(lab),
+                (x, y),
+                xytext=(6, 6),
+                textcoords="offset points",
+                fontsize=fontsize,
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7),
+                zorder=10
+            )
+
+    # Plot behavior knobs
+    boundary_mode = "ellipse"   # "ellipse" or "convex_hull"
+    ellipse_nstd = 2.0          # boundary tightness for ellipse
+    outlier_label_fontsize = 9  # label size
+    # Data prep
     df = _ensure_variety_col(aroma_matrix, "Variety")
     varieties = df["Variety"].astype(str).values
 
     X = df.drop(columns=["Variety"], errors="ignore").select_dtypes(include=[np.number]).fillna(0)
     X_scaled = StandardScaler().fit_transform(X)
 
+    # PCA to >= 90% variance
     pca_full = PCA().fit(X_scaled)
     explained = np.cumsum(pca_full.explained_variance_ratio_)
     n_comp = int(np.argmax(explained >= 0.9) + 1)
     print(f"PCA comps for ≥90% variance: {n_comp} ({explained[n_comp-1]*100:.1f}%)")
-
     pca = PCA(n_components=n_comp)
     X_pca = pca.fit_transform(X_scaled)
-
+    # GMM model selection
     bics, aics = [], []
     k_range = range(2, 11)
     for k in k_range:
@@ -1368,9 +1340,12 @@ def analyze_aroma_clusters_gmm(
     best_k = list(k_range)[int(np.argmin(bics))]
     print(f"Best k by BIC: {best_k}")
 
+    # Fit final GMM
     gmm = GaussianMixture(n_components=best_k, covariance_type="full", random_state=42)
     cluster_labels = gmm.fit_predict(X_pca)
 
+   
+    # Cluster metrics
     if len(set(cluster_labels)) > 1:
         silhouette = silhouette_score(X_pca, cluster_labels)
         dbi = davies_bouldin_score(X_pca, cluster_labels)
@@ -1379,9 +1354,10 @@ def analyze_aroma_clusters_gmm(
         silhouette, dbi, chi = np.nan, np.nan, np.nan
 
     print(f"Silhouette={silhouette:.3f} | DBI={dbi:.3f} | CHI={chi:.1f}")
-
+    # Outlier detection (Mahalanobis)
     scores2d = X_pca[:, :2]
     outlier_data = scores2d if outlier_space.lower() == "2d" else X_pca
+
     mean_vec = np.mean(outlier_data, axis=0)
     cov_matrix = np.cov(outlier_data, rowvar=False)
     inv_cov = np.linalg.pinv(cov_matrix)
@@ -1403,46 +1379,91 @@ def analyze_aroma_clusters_gmm(
         "is_outlier": outlier_mask
     })
     results.to_csv(os.path.join(output_dir, "gmm_cluster_results.csv"), index=False)
-        # ---- Print outliers ----
-    outliers_df = results[results["is_outlier"]].sort_values("Mahalanobis", ascending=False)
 
+    # Print outliers 
+    outliers_df = results[results["is_outlier"]].sort_values("Mahalanobis", ascending=False)
     print(f"Outliers detected: {outliers_df.shape[0]} / {results.shape[0]}")
     if not outliers_df.empty:
         print("Outlier varieties (sorted by Mahalanobis distance):")
         for _, row in outliers_df.iterrows():
             print(f" - {row['Variety']} | Cluster={int(row['Cluster'])+1} | Mahalanobis={row['Mahalanobis']:.3f}")
 
-    # PC1/PC2 plot
+    # PC1/PC2 plot (labels + boundaries)
     plt.figure(figsize=(12, 9))
-    plt.grid(False)
+    ax = plt.gca()
+    ax.grid(False)
+
     colors = plt.cm.tab10(np.linspace(0, 1, best_k))
     for i, color in enumerate(colors):
         pts = scores2d[cluster_labels == i]
-        plt.scatter(pts[:, 0], pts[:, 1], color=color, s=80, alpha=0.85, edgecolor="k", label=f"Cluster {i+1}")
+        ax.scatter(pts[:, 0], pts[:, 1],
+                   color=color, s=80, alpha=0.85, edgecolor="k",
+                   label=f"Cluster {i+1}")
 
-    plt.scatter(scores2d[outlier_mask, 0], scores2d[outlier_mask, 1],
-                color="red", edgecolor="black", s=130, label="Outliers", zorder=5)
-    plt.axhline(0, color="gray", lw=0.8, alpha=0.6)
-    plt.axvline(0, color="gray", lw=0.8, alpha=0.6)
-    plt.xlabel("PC1")
-    plt.ylabel("PC2")
-    plt.title("PCA + GMM Clustering (Outliers Highlighted)")
-    plt.legend()
+        if boundary_mode == "ellipse":
+            _draw_cov_ellipse(ax, pts, n_std=ellipse_nstd, edgecolor=color, linewidth=2, alpha=0.9)
+        else:
+            _draw_convex_hull(ax, pts, color=color, linewidth=2, alpha=0.9)
+
+    # Outliers highlight
+    ax.scatter(scores2d[outlier_mask, 0], scores2d[outlier_mask, 1],
+               color="red", edgecolor="black", s=130, label="Outliers", zorder=6)
+
+    # Outlier labels
+    outlier_names = varieties[outlier_mask]
+    _label_points(ax,
+                  scores2d[outlier_mask, 0],
+                  scores2d[outlier_mask, 1],
+                  outlier_names,
+                  fontsize=outlier_label_fontsize)
+
+    ax.axhline(0, color="gray", lw=0.8, alpha=0.6)
+    ax.axvline(0, color="gray", lw=0.8, alpha=0.6)
+    ax.set_xlabel("PC1")
+    ax.set_ylabel("PC2")
+    ax.set_title("PCA + GMM Clustering (Outliers Labeled, Cluster Boundaries)")
+    ax.legend()
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "pca_gmm_clusters.png"), dpi=300)
     plt.show()
 
-    # t-SNE (on PCA)
+    # t-SNE plot (labels + boundaries)
     tsne = TSNE(n_components=2, perplexity=30, learning_rate=200, n_iter=1500, random_state=42)
     X_tsne = tsne.fit_transform(X_pca)
+
     plt.figure(figsize=(10, 8))
-    sns.scatterplot(x=X_tsne[:, 0], y=X_tsne[:, 1], hue=cluster_labels, palette="tab10", s=90, alpha=0.9, edgecolor="k")
-    plt.scatter(X_tsne[outlier_mask, 0], X_tsne[outlier_mask, 1], color="red", edgecolor="black", s=130, label="Outliers")
-    plt.title("t-SNE Visualization of GMM Clusters")
+    ax = plt.gca()
+    ax.grid(False)
+
+    for i, color in enumerate(colors):
+        pts = X_tsne[cluster_labels == i]
+        ax.scatter(pts[:, 0], pts[:, 1],
+                   color=color, s=90, alpha=0.9, edgecolor="k",
+                   label=f"Cluster {i+1}")
+
+        if boundary_mode == "ellipse":
+            _draw_cov_ellipse(ax, pts, n_std=ellipse_nstd, edgecolor=color, linewidth=2, alpha=0.9)
+        else:
+            _draw_convex_hull(ax, pts, color=color, linewidth=2, alpha=0.9)
+
+    # Outliers highlight
+    ax.scatter(X_tsne[outlier_mask, 0], X_tsne[outlier_mask, 1],
+               color="red", edgecolor="black", s=140, label="Outliers", zorder=6)
+
+    # Outlier labels
+    _label_points(ax,
+                  X_tsne[outlier_mask, 0],
+                  X_tsne[outlier_mask, 1],
+                  outlier_names,
+                  fontsize=outlier_label_fontsize)
+
+    ax.set_title("t-SNE Visualization of GMM Clusters (Outliers Labeled, Cluster Boundaries)")
+    ax.legend()
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "tsne_gmm.png"), dpi=300)
     plt.show()
 
+    # Cluster means (original space)
     cluster_means = pd.DataFrame(X, index=varieties).groupby(cluster_labels).mean()
     return results, cluster_means
 
@@ -1503,7 +1524,6 @@ def plot_outlier_vs_normal_aromas(
 
 
 #  Heatmaps / summaries / PCA feature importance
-
 def summarize_aroma_intensities(aroma_matrix: pd.DataFrame, top_n: int = 10):
     numeric_data = aroma_matrix.select_dtypes(include=["number"])
     desc_stats = numeric_data.describe().T
@@ -1582,7 +1602,6 @@ def compute_feature_importance_from_pca(aroma_matrix: pd.DataFrame, n_components
 
 
 #  Sensory side (cleaning + merge + correlation + prediction)
-
 SENSORY_COLS = [
     "Metallic Flavour","Bitter Flavour","Earthy Flavour","Sour Flavour",
     "Fresh Flavour","Sweet Flavour","Root/ Vegetable Flavour",
@@ -1694,18 +1713,15 @@ def plot_aroma_sensory_correlation(
     plt.title("Correlation Between Aroma Compounds and Sensory Attributes", fontsize=16, pad=15)
     plt.tight_layout()
     plt.show()
-
     if save_path:
         os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
         strong.to_csv(save_path)
         print("Saved:", save_path)
-
     return strong
 
 
 
 # Dashboard 
-
 def launch_aroma_dashboard(aroma_matrix: pd.DataFrame, port: int = 7031) -> None:
     """
     Dash/Plotly dashboard. Imports inside so module import doesn't fail if dash isn't installed.
@@ -1749,7 +1765,6 @@ def launch_aroma_dashboard(aroma_matrix: pd.DataFrame, port: int = 7031) -> None
         fig_heat = px.imshow(heat_df, aspect="auto", title="Heatmap of Compounds Across Varieties")
         fig_heat.update_layout(height=600, margin=dict(l=90, r=20, t=60, b=120))
         return fig_bar, fig_heat
-
     print(f"\nLaunching dashboard at: http://127.0.0.1:{port}")
     app.run(debug=True, port=port)
 
@@ -1867,7 +1882,6 @@ def perform_knn_sensory_projection(
 
         pc_df = pd.concat([panel_pc_df, nonpanel_pc_df], ignore_index=True)
 
-
     # Loadings
     loadings_df = pd.DataFrame(
         pca.components_.T,
@@ -1879,9 +1893,8 @@ def perform_knn_sensory_projection(
           np.round(pca.explained_variance_ratio_, 3))
     print("Total projected varieties:", pc_df.shape[0])
 
-    # -------------------------------------------------
-    # 5) Save outputs
-    # -------------------------------------------------
+
+    #  Save outputs
     if save_projection_path:
         os.makedirs(os.path.dirname(save_projection_path), exist_ok=True)
         pc_df.to_csv(save_projection_path, index=False)
@@ -1925,7 +1938,6 @@ def plot_sensory_pca_biplot(pc_df, loadings_df, scaling_factor=15):
 
     plt.axhline(0, color="grey", linestyle="--", linewidth=0.8)
     plt.axvline(0, color="grey", linestyle="--", linewidth=0.8)
-
     plt.xlabel("PC1")
     plt.ylabel("PC2")
     plt.title("Sensory PCA biplot with aroma-based KNN projection")
