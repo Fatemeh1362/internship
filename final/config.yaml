@@ -228,7 +228,7 @@ biorep1:
   data_paths:
     base_compound_dir: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/raw_data/compounds"
     output_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/combined.csv"
-    
+    sensory_reconstructed: "results/biorep1/sensory_reconstructed.csv"
 
     sample_files: *shared_sample_files
     blank_files: *blank_files
@@ -239,8 +239,10 @@ biorep1:
     aroma_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/documents/GitHub/internship/biorep1/aroma_compounds.csv"
     aroma_matrix_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/aroma_matrix.csv"
     aroma_sensory_corr_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/aroma_sensory_corr_output.csv"
-    outputs:
-    sensory_reconstructed: "results/sensory_reconstructed/sensory_reconstructed_biorep1.csv"
+    sensory_reconstructed_output: "results/sensory_reconstructed/sensory_reconstructed_biorep1.csv"
+    plsr_gene_vs_sensory_dir: "results/biorep1/plsr_gene_vs_sensory"
+
+
 
     sensory_pca:
       projection_path: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/sensory_pca_projection_knn.csv"
@@ -254,8 +256,9 @@ biorep1:
     aroma_data: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/documents/GitHub/internship/matched_per_variety_STRICT_ONLY1.csv"
     gwas_output_gene_aroma: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/save_results/gwas_aroma_all_traits.csv"
     gwas_output_sensory: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/gwas_sensory_PCs.csv"
-    
-
+    merged_snp_aroma_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/save_results/merged_snp_aroma.csv"
+    df_linear_cv_biorep1_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/save_results/df_linear_cv_biorep1.csv"
+    df_linear_no_outlier_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep1/save_results/df_linear_no_outlier.csv"
   parameters:
     rt_tolerance: 0.5
 
@@ -408,9 +411,6 @@ biorep2:
     aroma_sensory_corr_output: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep2/aroma_sensory_corr_output.csv"
 
   data:
-    sensory_data: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/compound_analysis/Sensorial profiling SD 2005.xlsx"
-    genetic_data: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Desktop/internship/bio_rep1/GeneMarkers-95 varieties 1.csv"
-    aroma_data: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/documents/GitHub/internship/biorep2/matched_per_variety_STRICT_ONLY.csv"
     gwas_output_gene_aroma: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep2/gwas_aroma_all_traits.csv"
     gwas_output_sensory: "C:/Users/fatemehm/OneDrive - Royal HZPC Group/Documents/GitHub/internship/biorep2/gwas_sensory_PCs.csv"
 
